@@ -10,4 +10,14 @@ plugins:
   scorecard.sdk.operatorframework.io/v2: {}
 projectName: immich-operator
 repo: github.com/rm3l/immich-operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: rm3l.org
+  group: media
+  kind: Immich
+  path: github.com/rm3l/immich-operator/api/v1alpha1
+  version: v1alpha1
 version: "3"

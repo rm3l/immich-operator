@@ -1,0 +1,50 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+  name: immich-operator.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: Immich is the Schema for the immiches API
+      displayName: Immich
+      kind: Immich
+      name: immiches.media.rm3l.org
+      version: v1alpha1
+  description: Immich Operator
+  displayName: immich-operator
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - immich
+  - media
+  - photos
+  links:
+  - name: Immich Operator
+    url: https://immich-operator.domain
+  maintainers:
+  - email: armel@rm3l.org
+    name: rm3l
+  maturity: alpha
+  provider:
+    name: Armel Soro
+    url: armel@rm3l.org
+  version: 0.0.0

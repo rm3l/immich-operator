@@ -1,8 +1,11 @@
----
+# permissions for end users to edit immiches.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: manager-role
+  labels:
+    app.kubernetes.io/name: immich-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: immich-editor-role
 rules:
 - apiGroups:
   - media.rm3l.org
@@ -19,14 +22,6 @@ rules:
 - apiGroups:
   - media.rm3l.org
   resources:
-  - immiches/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - media.rm3l.org
-  resources:
   - immiches/status
   verbs:
   - get
-  - patch
-  - update
