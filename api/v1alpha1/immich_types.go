@@ -25,11 +25,81 @@ import (
 
 // ImmichSpec defines the desired state of Immich
 type ImmichSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of Immich. Edit immich_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// Application settings
+	Application *Application `json:"application,omitempty"`
+}
+
+type Application struct {
+
+	// Database Backup settings.
+	// +optional
+	DatabaseBackup *DatabaseBackup `json:"databaseBackup,omitempty"`
+
+	// Job concurrency settings
+	// +optional
+	Concurrency *Concurrency `json:"concurrency,omitempty"`
+}
+
+type DatabaseBackup struct {
+
+	// Enable database backups.
+	// +optional
+	//+kubebuilder:default=true
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Scanning interval using the CRON format. For more information, please refer to e.g. https://crontab.guru/
+	// +optional
+	//+kubebuilder:default="0 02 * * *"
+	Cron *string `json:"cron,omitempty"`
+
+	// Amount of previous backups to keep
+	// +optional
+	//+kubebuilder:default=14
+	Amount *int32 `json:"amount,omitempty"`
+}
+
+type Concurrency struct {
+
+	//Thumbnail generation concurrency
+	// +optional
+	//+kubebuilder:default=5
+	Thumbnail *int32 `json:"thumbnail,omitempty"`
+
+	// Metadata extraction concurrency
+	// +optional
+	//+kubebuilder:default=5
+	MetadataExtraction *int32 `json:"metadataExtraction,omitempty"`
+
+	// Library concurrency
+	// +optional
+	//+kubebuilder:default=5
+	Library *int32 `json:"library,omitempty"`
+
+	// Sidecar metadata concurrency
+	// +optional
+	//+kubebuilder:default=5
+	Sidecar *int32 `json:"sidecar,omitempty"`
+
+	// Smart search concurrency
+	// +optional
+	//+kubebuilder:default=2
+	SmartSearch *int32 `json:"smartSearch,omitempty"`
+
+	// Face detection concurrency
+	// +optional
+	//+kubebuilder:default=2
+	FaceDetection *int32 `json:"faceDetection,omitempty"`
+
+	// Video transcoding concurrency
+	// +optional
+	//+kubebuilder:default=1
+	VideoConversion *int32 `json:"videoConversion,omitempty"`
+
+	// Migration concurrency
+	// +optional
+	//+kubebuilder:default=5
+	Migration *int32 `json:"migration,omitempty"`
 }
 
 // ImmichStatus defines the observed state of Immich

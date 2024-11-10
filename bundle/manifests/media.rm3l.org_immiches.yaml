@@ -39,10 +39,72 @@ spec:
           spec:
             description: ImmichSpec defines the desired state of Immich
             properties:
-              foo:
-                description: Foo is an example field of Immich. Edit immich_types.go
-                  to remove/update
-                type: string
+              application:
+                description: Application settings
+                properties:
+                  concurrency:
+                    description: Job concurrency settings
+                    properties:
+                      faceDetection:
+                        default: 2
+                        description: Face detection concurrency
+                        format: int32
+                        type: integer
+                      library:
+                        default: 5
+                        description: Library concurrency
+                        format: int32
+                        type: integer
+                      metadataExtraction:
+                        default: 5
+                        description: Metadata extraction concurrency
+                        format: int32
+                        type: integer
+                      migration:
+                        default: 5
+                        description: Migration concurrency
+                        format: int32
+                        type: integer
+                      sidecar:
+                        default: 5
+                        description: Sidecar metadata concurrency
+                        format: int32
+                        type: integer
+                      smartSearch:
+                        default: 2
+                        description: Smart search concurrency
+                        format: int32
+                        type: integer
+                      thumbnail:
+                        default: 5
+                        description: Thumbnail generation concurrency
+                        format: int32
+                        type: integer
+                      videoConversion:
+                        default: 1
+                        description: Video transcoding concurrency
+                        format: int32
+                        type: integer
+                    type: object
+                  databaseBackup:
+                    description: Database Backup settings.
+                    properties:
+                      amount:
+                        default: 14
+                        description: Amount of previous backups to keep
+                        format: int32
+                        type: integer
+                      cron:
+                        default: 0 02 * * *
+                        description: Scanning interval using the CRON format. For
+                          more information, please refer to e.g. https://crontab.guru/
+                        type: string
+                      enabled:
+                        default: true
+                        description: Enable database backups.
+                        type: boolean
+                    type: object
+                type: object
             type: object
           status:
             description: ImmichStatus defines the observed state of Immich
