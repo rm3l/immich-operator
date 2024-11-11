@@ -24,7 +24,21 @@ import (
 type ImmichSpec struct {
 
 	// Application settings
+	// +optional
 	Application *Application `json:"application,omitempty"`
+
+	// Immich Server settings
+	// +optional
+	Server *Server `json:"server,omitempty"`
+}
+
+type Server struct {
+
+	// Number of replicas
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=1
+	// +optional
+	Replicas *int32 `json:"replicas,omitempty"`
 }
 
 type Application struct {
@@ -91,7 +105,7 @@ type Application struct {
 	// Enable Reverse Geocoding using data from the GeoNames geographical database.
 	// +optional
 	//+kubebuilder:default=true
-	MapReverseGeocodingEnabled *bool `json:"mapEnabled,omitempty"`
+	MapReverseGeocodingEnabled *bool `json:"mapReverseGeocodingEnabled,omitempty"`
 
 	// Map Light style.
 	// +optional
@@ -141,7 +155,7 @@ type Application struct {
 	// Changes to this setting will be evaluated at the next execution.
 	// +kubebuilder:default=7
 	// +optional
-	UserDeleteTTLDays *bool `json:"userDeleteTTLDays,omitempty"`
+	UserDeleteTTLDays *int32 `json:"userDeleteTTLDays,omitempty"`
 
 	// Check for new versions of Immich. The version check feature relies on periodic communication with github.com
 	// +kubebuilder:default=true
@@ -439,17 +453,17 @@ type VideoTranscodingSettings struct {
 	AudioCodec *AudioCodec `json:"audioCodec,omitempty"`
 
 	// List of video codecs which do not need to be transcoded. Only used for certain transcode policies.
-	// +kubebuilder:default={"name":"h264"}
+	// +kubebuilder:default={{"name":"h264"}}
 	// +optional
 	AcceptedVideoCodecs *[]VideoCodec `json:"acceptedVideoCodecs,omitempty"`
 
 	// List of video codecs which do not need to be transcoded. Only used for certain transcode policies.
-	// +kubebuilder:default={"name":"aac","name":"mp3","name":"libopus","name":"pcm_s16le"}
+	// +kubebuilder:default={{"name":"aac"},{"name":"mp3"},{"name":"libopus"},{"name":"pcm_s16le"}}
 	// +optional
 	AcceptedAudioCodecs *[]AudioCodec `json:"acceptedAudioCodecs,omitempty"`
 
 	// List of container formats which do not need to be remuxed to MP4. Only used for certain transcode policies.
-	// +kubebuilder:default={"name":"mov","name":"ogg","name":"webm"}
+	// +kubebuilder:default={{"name":"mov"},{"name":"ogg"},{"name":"webm"}}
 	// +optional
 	AcceptedContainers *[]VideoContainer `json:"acceptedContainers,omitempty"`
 
