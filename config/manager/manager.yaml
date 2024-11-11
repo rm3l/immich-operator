@@ -64,6 +64,11 @@ spec:
         - --leader-elect
         image: controller:latest
         name: manager
+        env:
+          - name: IMMICH_RELEASE_TAG
+            value: v1.120.1
+          - name: IMMICH_SERVER_IMAGE
+            value: ghcr.io/immich-app/immich-server:$(IMMICH_RELEASE_TAG)
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

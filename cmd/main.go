@@ -125,6 +125,9 @@ func main() {
 	if err = (&controller.ImmichReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		// Add a Recorder to the reconciler.
+		// This allows the operator author to emit events during reconciliation.
+		Recorder: mgr.GetEventRecorderFor("immich-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Immich")
 		os.Exit(1)
