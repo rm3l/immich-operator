@@ -449,13 +449,18 @@ spec:
                     type: string
                   mapEnabled:
                     default: true
-                    description: Enable Reverse Geocoding using data from the GeoNames
-                      geographical database.
+                    description: Enable map features with rely on an external tile
+                      service (like tiles.immich.cloud).
                     type: boolean
                   mapLightStyleURL:
                     default: https://tiles.immich.cloud/v1/style/light.json
                     description: Map Light style.
                     type: string
+                  mapReverseGeocodingEnabled:
+                    default: true
+                    description: Enable Reverse Geocoding using data from the GeoNames
+                      geographical database.
+                    type: boolean
                   metadataFaceImportEnabled:
                     default: false
                     description: Import faces from image EXIF data and sidecar files
@@ -586,7 +591,8 @@ spec:
                       Number of days after removal to permanently delete a user's account and assets.
                       The user deletion job runs at midnight to check for users that are ready for deletion.
                       Changes to this setting will be evaluated at the next execution.
-                    type: boolean
+                    format: int32
+                    type: integer
                   versionCheckEnabled:
                     default: true
                     description: Check for new versions of Immich. The version check
@@ -598,7 +604,10 @@ spec:
                     properties:
                       acceptedAudioCodecs:
                         default:
-                          name: pcm_s16le
+                        - name: aac
+                        - name: mp3
+                        - name: libopus
+                        - name: pcm_s16le
                         description: List of video codecs which do not need to be
                           transcoded. Only used for certain transcode policies.
                         items:
@@ -616,7 +625,9 @@ spec:
                         type: array
                       acceptedContainers:
                         default:
-                          name: webm
+                        - name: mov
+                        - name: ogg
+                        - name: webm
                         description: List of container formats which do not need to
                           be remuxed to MP4. Only used for certain transcode policies.
                         items:
@@ -633,7 +644,7 @@ spec:
                         type: array
                       acceptedVideoCodecs:
                         default:
-                          name: h264
+                        - name: h264
                         description: List of video codecs which do not need to be
                           transcoded. Only used for certain transcode policies.
                         items:
@@ -807,6 +818,16 @@ spec:
                   welcomeMessage:
                     description: Domain for public shared links, including http(s)://
                     type: string
+                type: object
+              server:
+                description: Immich Server settings
+                properties:
+                  replicas:
+                    default: 1
+                    description: Number of replicas
+                    format: int32
+                    minimum: 0
+                    type: integer
                 type: object
             type: object
           status:
