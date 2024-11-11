@@ -86,8 +86,12 @@ spec:
                         format: int32
                         type: integer
                     type: object
+                  customCSS:
+                    description: Cascading Style Sheets allow the design of Immich
+                      to be customized.
+                    type: string
                   databaseBackup:
-                    description: Database Backup settings.
+                    description: Database Backup settings
                     properties:
                       amount:
                         default: 14
@@ -104,6 +108,705 @@ spec:
                         description: Enable database backups.
                         type: boolean
                     type: object
+                  email:
+                    description: Settings for sending email notifications
+                    properties:
+                      enabled:
+                        default: false
+                        description: Enable email notifications.
+                        type: boolean
+                      fromAddressSecretKeyRef:
+                        description: |-
+                          Secret containing the sender email address.
+                          The secret could contain something like: "Immich Photo Server <noreply@example.com>"
+                        properties:
+                          key:
+                            description: Key in the Secret
+                            type: string
+                          name:
+                            description: Secret Name
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      passwordSecretKeyRef:
+                        description: Password to use when authenticating with the
+                          email server
+                        properties:
+                          key:
+                            description: Key in the Secret
+                            type: string
+                          name:
+                            description: Secret Name
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      serverHostSecretKeyRef:
+                        description: Host of the email server (e.g. smtp.immich.app)
+                        example: smtp.immich.app
+                        properties:
+                          key:
+                            description: Key in the Secret
+                            type: string
+                          name:
+                            description: Secret Name
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      serverPort:
+                        description: Port of the email server (e.g 25, 465, or 587)
+                        example: 587
+                        format: int32
+                        maximum: 65535
+                        minimum: 0
+                        type: integer
+                      skipCertificateChecks:
+                        default: false
+                        description: Ignore TLS certificate validation errors (not
+                          recommended)
+                        type: boolean
+                      usernameSecretKeyRef:
+                        description: Username to use when authenticating with the
+                          email server
+                        properties:
+                          key:
+                            description: Key in the Secret
+                            type: string
+                          name:
+                            description: Secret Name
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                    type: object
+                  experimentalSettings:
+                    description: Experimental settings
+                    properties:
+                      hardwareAcceleration:
+                        properties:
+                          accelerationAPI:
+                            default: disabled
+                            description: |-
+                              Acceleration API. The API that will interact with your device to accelerate transcoding.
+                              This setting is 'best effort': it will fallback to software transcoding on failure.
+                              VP9 may or may not work depending on your hardware.
+                              nvenc means "NVENC (requires NVIDIA GPU)".
+                              qsv means "Quick Sync (requires 7th gen Intel CPU or later)".
+                              vaapi means "VAAPI".
+                              rkmpp means "RKMPP (only on Rockchip SOCs)".
+                            enum:
+                            - nvenc
+                            - qsv
+                            - vaapi
+                            - rkmpp
+                            - disabled
+                            type: string
+                          constantQualityMode:
+                            default: auto
+                            description: |-
+                              Constant quality mode.
+                              ICQ is better than CQP, but some hardware acceleration devices do not support this mode.
+                              Setting this option will prefer the specified mode when using quality-based encoding.
+                              Ignored by NVENC as it does not support ICQ.
+                            enum:
+                            - auto
+                            - icq
+                            - cqp
+                            type: string
+                          hardwareDecodingEnabled:
+                            default: false
+                            description: |-
+                              Enables end-to-end acceleration instead of only accelerating encoding.
+                              May not work on all videos.
+                            type: boolean
+                          preferredHardwareDevice:
+                            default: auto
+                            description: |-
+                              Preferred Hardware device.
+                              Applies only to VAAPI and QSV. Sets the dri node used for hardware transcoding.
+                            type: string
+                          temporalAQEnabled:
+                            default: false
+                            description: |-
+                              Applies only to NVENC. Increases quality of high-detail, low-motion scenes.
+                              May not be compatible with older devices.
+                            type: boolean
+                        type: object
+                      watchExternalLibrary:
+                        default: false
+                        description: Automatically watch external library for changed
+                          files
+                        type: boolean
+                    type: object
+                  externalDomain:
+                    description: Domain for public shared links, including http(s)://
+                    type: string
+                  externalLibraryScanning:
+                    description: Periodic library scanning
+                    properties:
+                      cron:
+                        default: 0 2 * * *
+                        description: Scanning interval using the CRON format. For
+                          more information, please refer to e.g. https://crontab.guru/
+                        type: string
+                      enabled:
+                        default: true
+                        description: Enable periodic library scanning.
+                        type: boolean
+                    type: object
+                  imageSettings:
+                    description: Quality and resolution of generated images
+                    properties:
+                      embeddedPreviewEnabled:
+                        default: false
+                        description: |-
+                          Prefer embedded preview.
+                          Use embedded previews in RAW photos as the input to image processing when available.
+                          This can produce more accurate colors for some images,
+                          but the quality of the preview is camera-dependent
+                          and the image may have more compression artifacts.
+                        type: boolean
+                      p3ColorSpaceEnabled:
+                        default: true
+                        description: |-
+                          Prefer wide gamut.
+                          Use Display P3 for thumbnails. This better preserves the vibrance of images with wide colorspaces,
+                          but images may appear differently on old devices with an old browser version.
+                          sRGB images are kept as sRGB to avoid color shifts.
+                        type: boolean
+                      previewFormat:
+                        default: jpeg
+                        description: |-
+                          Preview format.
+                          WebP produces smaller files than JPEG, but is slower to encode.
+                        enum:
+                        - webp
+                        - jpeg
+                        type: string
+                      previewQuality:
+                        default: 80
+                        description: |-
+                          Preview quality from 1-100.
+                          Higher is better, but produces larger files and can reduce app responsiveness.
+                        format: int32
+                        maximum: 100
+                        minimum: 1
+                        type: integer
+                      previewResolution:
+                        default: 1440
+                        description: |-
+                          Preview resolution.
+                          Higher resolutions can preserve more detail but take longer to encode,
+                          have larger file sizes and can reduce app responsiveness.
+                        enum:
+                        - 720
+                        - 1080
+                        - 1440
+                        - 4000
+                        format: int32
+                        type: integer
+                      thumbnailFormat:
+                        default: webp
+                        description: |-
+                          Thumbnail format.
+                          WebP produces smaller files than JPEG, but is slower to encode.
+                        enum:
+                        - webp
+                        - jpeg
+                        type: string
+                      thumbnailQuality:
+                        default: 80
+                        description: |-
+                          Thumbnail quality from 1-100.
+                          Higher is better, but produces larger files and can reduce app responsiveness.
+                        format: int32
+                        maximum: 100
+                        minimum: 1
+                        type: integer
+                      thumbnailResolution:
+                        default: 250
+                        description: |-
+                          Thumbnail resolution.
+                          Higher resolutions can preserve more detail but take longer to encode,
+                          have larger file sizes and can reduce app responsiveness.
+                        enum:
+                        - 200
+                        - 250
+                        - 480
+                        - 720
+                        - 1080
+                        format: int32
+                        type: integer
+                    type: object
+                  logging:
+                    description: Log Settings
+                    properties:
+                      enabled:
+                        default: true
+                        description: Enable logging.
+                        type: boolean
+                      level:
+                        default: log
+                        description: Log level when enabled.
+                        enum:
+                        - fatal
+                        - error
+                        - warn
+                        - log
+                        - debug
+                        - verbose
+                        type: string
+                    type: object
+                  machineLearning:
+                    description: Machine Learning Settings
+                    properties:
+                      duplicateDetectionEnabled:
+                        default: true
+                        description: |-
+                          Use CLIP embeddings to find likely duplicates.
+                          If disabled, exactly identical assets will still be de-duplicated.
+                        type: boolean
+                      duplicateMaxDistance:
+                        default: "0.01"
+                        description: |-
+                          Maximum distance between two images to consider them duplicates, ranging from 0.001-0.1.
+                          Higher values will detect more duplicates, but may result in false positives.
+                          TODO Convert from string to float
+                        type: string
+                      enabled:
+                        default: true
+                        description: Enable machine learning.
+                        type: boolean
+                      facialRecognitionEnabled:
+                        default: true
+                        description: |-
+                          Detect, recognize and group faces in images.
+                          If disabled, images will not be encoded for facial recognition and will not populate the People section in the Explore page.
+                        type: boolean
+                      facialRecognitionMaxDistance:
+                        default: "0.2"
+                        description: |-
+                          Maximum distance between two faces to be considered the same person, ranging from 0-2.
+                          Lowering this can prevent labeling two people as the same person,
+                          while raising it can prevent labeling the same person as two different people.
+                          Note that it is easier to merge two people than to split one person in two,
+                          so err on the side of a lower threshold when possible.
+                          TODO Convert from string to float
+                        type: string
+                      facialRecognitionMinFaces:
+                        default: 3
+                        description: |-
+                          The minimum number of recognized faces for a person to be created.
+                          Increasing this makes Facial Recognition more precise at the cost of increasing
+                          the chance that a face is not assigned to a person.
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      facialRecognitionMinScore:
+                        default: "0.3"
+                        description: |-
+                          Minimum confidence score for a face to be detected from 0-1.
+                          Lower values will detect more faces but may result in false positives.
+                          TODO Convert from string to float
+                        type: string
+                      facialRecognitionModelName:
+                        default: buffalo_l
+                        description: |-
+                          Facial recognition model.
+                          Models are listed in descending order of size. Larger models are slower and use more memory, but produce better results.
+                          Note that you must re-run the Face Detection job for all images upon changing a model.
+                        enum:
+                        - antelopev2
+                        - buffalo_l
+                        - buffalo_m
+                        - buffalo_s
+                        type: string
+                      serverURL:
+                        description: Machine Learning server URL.
+                        type: string
+                      smartSearchClipModelName:
+                        default: ViT-B-16-SigLIP-512__webli
+                        description: |-
+                          The name of a CLIP model listed at https://huggingface.co/immich-app .
+                          Note that you must re-run the 'Smart Search' job for all images upon changing a model.
+                        type: string
+                      smartSearchEnabled:
+                        default: true
+                        description: |-
+                          Search for images semantically using CLIP embeddings.
+                          If disabled, images will not be encoded for smart search.
+                        type: boolean
+                    type: object
+                  mapDarkStyleURL:
+                    default: https://tiles.immich.cloud/v1/style/dark.json
+                    description: Map Dark style.
+                    type: string
+                  mapEnabled:
+                    default: true
+                    description: Enable Reverse Geocoding using data from the GeoNames
+                      geographical database.
+                    type: boolean
+                  mapLightStyleURL:
+                    default: https://tiles.immich.cloud/v1/style/light.json
+                    description: Map Light style.
+                    type: string
+                  metadataFaceImportEnabled:
+                    default: false
+                    description: Import faces from image EXIF data and sidecar files
+                    type: boolean
+                  oauth:
+                    description: OAuth Login Settings
+                    properties:
+                      autoLaunch:
+                        default: false
+                        description: Start the OAuthLogin login flow automatically
+                          upon navigating to the login page
+                        type: boolean
+                      autoRegister:
+                        default: true
+                        description: Automatically register new users after signing
+                          in with OAuthLogin
+                        type: boolean
+                      buttonText:
+                        default: Login with OAuthLogin
+                        description: Button Text
+                        type: string
+                      clientIdSecret:
+                        description: Secret containing the client ID
+                        properties:
+                          key:
+                            description: Key in the Secret
+                            type: string
+                          name:
+                            description: Secret Name
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      clientSecretSecret:
+                        description: Secret containing the client ID
+                        properties:
+                          key:
+                            description: Key in the Secret
+                            type: string
+                          name:
+                            description: Secret Name
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      defaultStorageQuota:
+                        default: 0
+                        description: Quota in GiB to be used when no claim is provided
+                          (Enter 0 for unlimited quota).
+                        type: integer
+                      enabled:
+                        default: false
+                        description: Login with OAuthLogin.
+                        type: boolean
+                      issuerUrl:
+                        description: Issuer URL
+                        type: string
+                      mobileRedirectUri:
+                        description: Enable when OAuthLogin provider does not allow
+                          a mobile URI, like {callback}
+                        type: string
+                      profileSigningAlgorithm:
+                        default: none
+                        description: |-
+                          Algorithm used to sign the user profile.
+                          TODO: list
+                        type: string
+                      scope:
+                        default:
+                        - openid
+                        - email
+                        - profile
+                        description: OAuthLogin Scopes
+                        items:
+                          type: string
+                        type: array
+                      signingAlgorithm:
+                        default: RS256
+                        description: |-
+                          Signing algorithm
+                          TODO: list
+                        type: string
+                      storageLabelClaim:
+                        default: preferred_username
+                        description: Automatically set the user's storage label to
+                          the value of this claim.
+                        type: string
+                      storageQuotaClaim:
+                        default: immich_quota
+                        description: Automatically set the user's storage quota to
+                          the value of this claim.
+                        type: string
+                    type: object
+                  passwordLoginEnabled:
+                    default: true
+                    description: Login with email and password
+                    type: boolean
+                  storageTemplateEnabled:
+                    default: true
+                    description: This manages the folder structure and filename of
+                      the upload asset.
+                    type: boolean
+                  storageTemplateHashVerificationEnabled:
+                    default: true
+                    description: Enables hash verification, don't disable this unless
+                      you're certain of the implications
+                    type: boolean
+                  storageTemplateTemplate:
+                    default: '{{y}}/{{y}}-{{MM}}-{{dd}}/{{filename}}'
+                    description: Enables hash verification, don't disable this unless
+                      you're certain of the implications
+                    type: string
+                  trashEnabled:
+                    default: true
+                    description: Enable trash
+                    type: boolean
+                  trashTTLDays:
+                    default: 30
+                    description: Number of days to keep the assets in trash before
+                      permanently removing them
+                    format: int32
+                    type: integer
+                  userDeleteTTLDays:
+                    default: 7
+                    description: |-
+                      Number of days after removal to permanently delete a user's account and assets.
+                      The user deletion job runs at midnight to check for users that are ready for deletion.
+                      Changes to this setting will be evaluated at the next execution.
+                    type: boolean
+                  versionCheckEnabled:
+                    default: true
+                    description: Check for new versions of Immich. The version check
+                      feature relies on periodic communication with github.com
+                    type: boolean
+                  videoTranscodingSettings:
+                    description: Resolution and encoding information of the video
+                      files
+                    properties:
+                      acceptedAudioCodecs:
+                        default:
+                          name: pcm_s16le
+                        description: List of video codecs which do not need to be
+                          transcoded. Only used for certain transcode policies.
+                        items:
+                          properties:
+                            name:
+                              enum:
+                              - aac
+                              - mp3
+                              - libopus
+                              - pcm_s16le
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
+                      acceptedContainers:
+                        default:
+                          name: webm
+                        description: List of container formats which do not need to
+                          be remuxed to MP4. Only used for certain transcode policies.
+                        items:
+                          properties:
+                            name:
+                              enum:
+                              - mov
+                              - ogg
+                              - webm
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
+                      acceptedVideoCodecs:
+                        default:
+                          name: h264
+                        description: List of video codecs which do not need to be
+                          transcoded. Only used for certain transcode policies.
+                        items:
+                          properties:
+                            name:
+                              enum:
+                              - h264
+                              - hevc
+                              - vp9
+                              - av1
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
+                      audioCodec:
+                        default:
+                          name: aac
+                        description: |-
+                          Audio codec.
+                          Opus is the highest quality option, but has lower compatibility with old devices or software.
+                        properties:
+                          name:
+                            enum:
+                            - aac
+                            - mp3
+                            - libopus
+                            - pcm_s16le
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      compressionSpeed:
+                        default: ultrafast
+                        description: |-
+                          Compression speed.
+                          Slower presets produce smaller files, and increase quality when targeting a certain bitrate.
+                          VP9 ignores speeds above 'faster'.
+                        enum:
+                        - ultrafast
+                        - superfast
+                        - veryfast
+                        - faster
+                        - fast
+                        - medium
+                        - slow
+                        - slower
+                        - veryslow
+                        type: string
+                      constantRateFactor:
+                        default: 23
+                        description: |-
+                          Video quality level. Typical values are 23 for H.264, 28 for HEVC, 31 for VP9, and 35 for AV1.
+                          Lower is better, but produces larger files.
+                        format: int32
+                        type: integer
+                      maxBitrate:
+                        default: "0"
+                        description: |-
+                          Maximum bitrate.
+                          Setting a max bitrate can make file sizes more predictable at a minor cost to quality.
+                          At 720p, typical values are 2600k for VP9 or HEVC, or 4500k for H.264.
+                          Disabled if set to 0.
+                        type: string
+                      maximumBFrames:
+                        default: -1
+                        description: |-
+                          Maximum B-frames.
+                          Higher values improve compression efficiency, but slow down encoding.
+                          May not be compatible with hardware acceleration on older devices.
+                          0 disables B-frames, while -1 sets this value automatically.
+                        format: int32
+                        type: integer
+                      maximumKFrameInterval:
+                        default: 0
+                        description: |-
+                          the maximum frame distance between keyframes.
+                          Lower values worsen compression efficiency,
+                          but improve seek times and may improve quality in scenes with fast movement.
+                          0 sets this value automatically.
+                        format: int32
+                        type: integer
+                      referenceFrames:
+                        default: 0
+                        description: |-
+                          The number of frames to reference when compressing a given frame.
+                          Higher values improve compression efficiency, but slow down encoding.
+                          0 sets this value automatically.
+                        format: int32
+                        type: integer
+                      targetResolution:
+                        default: "720"
+                        description: |-
+                          Target resolution.
+                          Higher resolutions can preserve more detail but take longer to encode,
+                          have larger file sizes, and can reduce app responsiveness.
+                        enum:
+                        - original
+                        - "480"
+                        - "720"
+                        - "1080"
+                        - "1440"
+                        - "2160"
+                        type: string
+                      threads:
+                        default: 0
+                        description: |-
+                          Higher values lead to faster encoding, but leave less room for the server to process other tasks while active.
+                          This value should not be more than the number of CPU cores.
+                          Maximizes utilization if set to 0.
+                        format: int32
+                        type: integer
+                      toneMappingAlgorithm:
+                        default: hable
+                        description: |-
+                          Attempts to preserve the appearance of HDR videos when converted to SDR.
+                          Each algorithm makes different tradeoffs for color, detail and brightness.
+                          Hable preserves detail, Mobius preserves color, and Reinhard preserves brightness.
+                        enum:
+                        - hable
+                        - mobius
+                        - reinhard
+                        - disabled
+                        type: string
+                      transcodePolicy:
+                        default: required
+                        description: |-
+                          Policy for when a video should be transcoded.
+                          HDR videos will always be transcoded (except if transcoding is disabled).
+                          "all" means "All videos".
+                          "optimal" means "Videos higher than target resolution or not in an accepted format".
+                          "bitrate" means "Videos higher than max bitrate or not in an accepted format".
+                          "required" means "Only videos not in an accepted format".
+                          "disabled" means "Don't transcode any videos, may break playback on some clients".
+                        enum:
+                        - all
+                        - optimal
+                        - bitrate
+                        - required
+                        - disabled
+                        type: string
+                      twoPassEncodingEnabled:
+                        default: false
+                        description: |-
+                          Transcode in two passes to produce better encoded videos.
+                          When max bitrate is enabled (required for it to work with H.264 and HEVC),
+                          this mode uses a bitrate range based on the max bitrate and ignores CRF.
+                          For VP9, CRF can be used if max bitrate is disabled.
+                        type: boolean
+                      videoCodec:
+                        default:
+                          name: h264
+                        description: |-
+                          Video codec.
+                          VP9 has high efficiency and web compatibility, but takes longer to transcode.
+                          HEVC performs similarly, but has lower web compatibility.
+                          H.264 is widely compatible and quick to transcode, but produces much larger files.
+                          AV1 is the most efficient codec but lacks support on older devices.
+                        properties:
+                          name:
+                            enum:
+                            - h264
+                            - hevc
+                            - vp9
+                            - av1
+                            type: string
+                        required:
+                        - name
+                        type: object
+                    type: object
+                  welcomeMessage:
+                    description: Domain for public shared links, including http(s)://
+                    type: string
                 type: object
             type: object
           status:
