@@ -687,8 +687,19 @@ type JobConcurrency struct {
 
 // ImmichStatus defines the observed state of Immich
 type ImmichStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Represents the observations of a Immich's current state.
+	// Immich.status.conditions.type are: "Available", "Progressing", and "Degraded"
+	// Immich.status.conditions.status are one of True, False, Unknown.
+	// Immich.status.conditions.reason the value should be a CamelCase string and producers of specific
+	// condition types may define expected values and meanings for this field, and whether the values
+	// are considered a guaranteed API.
+	// Immich.status.conditions.Message is a human-readable message indicating details about the transition.
+	// For further information see: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
+
+	// Conditions store the status conditions of the Immich instances
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 //+kubebuilder:object:root=true
