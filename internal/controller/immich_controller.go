@@ -654,7 +654,7 @@ func (r *ImmichReconciler) reconcileMLDeployment(ctx context.Context, immich *me
 	})
 }
 
-func (r *ImmichReconciler) getMLVolumeMounts(immich *mediav1alpha1.Immich) []corev1.VolumeMount {
+func (r *ImmichReconciler) getMLVolumeMounts(_ *mediav1alpha1.Immich) []corev1.VolumeMount {
 	return []corev1.VolumeMount{
 		{
 			Name:      "cache",
@@ -1174,11 +1174,14 @@ func (r *ImmichReconciler) reconcileServerIngress(ctx context.Context, immich *m
 		for _, host := range immich.Spec.Server.Ingress.Hosts {
 			var paths []networkingv1.HTTPIngressPath
 			for _, p := range host.Paths {
-				pathType := networkingv1.PathTypePrefix
-				if p.PathType == "Exact" {
+				var pathType networkingv1.PathType
+				switch p.PathType {
+				case "Exact":
 					pathType = networkingv1.PathTypeExact
-				} else if p.PathType == "ImplementationSpecific" {
+				case "ImplementationSpecific":
 					pathType = networkingv1.PathTypeImplementationSpecific
+				default:
+					pathType = networkingv1.PathTypePrefix
 				}
 				path := p.Path
 				if path == "" {
