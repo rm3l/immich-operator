@@ -2,7 +2,7 @@ apiVersion: media.rm3l.org/v1alpha1
 kind: Immich
 metadata:
   labels:
-    app.kubernetes.io/name: immich-operator-v2
+    app.kubernetes.io/name: immich-operator
     app.kubernetes.io/managed-by: kustomize
   name: immich-sample
 spec:

@@ -1,0 +1,392 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: |-
+      [
+        {
+          "apiVersion": "media.rm3l.org/v1alpha1",
+          "kind": "Immich",
+          "metadata": {
+            "name": "immich-minimal"
+          },
+          "spec": {
+            "immich": {
+              "persistence": {
+                "library": {
+                  "existingClaim": "immich-library"
+                }
+              }
+            },
+            "machineLearning": {
+              "enabled": true
+            },
+            "postgres": {
+              "host": "postgres",
+              "passwordSecretRef": {
+                "key": "password",
+                "name": "immich-postgres"
+              }
+            },
+            "valkey": {
+              "enabled": true
+            }
+          }
+        },
+        {
+          "apiVersion": "media.rm3l.org/v1alpha1",
+          "kind": "Immich",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/managed-by": "kustomize",
+              "app.kubernetes.io/name": "immich-operator"
+            },
+            "name": "immich-sample"
+          },
+          "spec": {
+            "image": {
+              "pullPolicy": "IfNotPresent",
+              "tag": "v1.125.7"
+            },
+            "immich": {
+              "configuration": {
+                "storageTemplate": {
+                  "enabled": true,
+                  "template": "{{y}}/{{y}}-{{MM}}-{{dd}}/{{filename}}"
+                },
+                "trash": {
+                  "days": 30,
+                  "enabled": true
+                }
+              },
+              "configurationKind": "ConfigMap",
+              "metrics": {
+                "enabled": false
+              },
+              "persistence": {
+                "library": {
+                  "existingClaim": "immich-library"
+                }
+              }
+            },
+            "machineLearning": {
+              "enabled": true,
+              "persistence": {
+                "enabled": true,
+                "size": "10Gi"
+              },
+              "replicas": 1,
+              "resources": {
+                "limits": {
+                  "memory": "4Gi"
+                },
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "512Mi"
+                }
+              }
+            },
+            "postgres": {
+              "database": "immich",
+              "host": "postgres.database.svc.cluster.local",
+              "passwordSecretRef": {
+                "key": "password",
+                "name": "immich-postgres"
+              },
+              "port": 5432,
+              "username": "immich"
+            },
+            "server": {
+              "enabled": true,
+              "ingress": {
+                "annotations": {
+                  "nginx.ingress.kubernetes.io/proxy-body-size": "0"
+                },
+                "enabled": true,
+                "hosts": [
+                  {
+                    "host": "immich.example.com",
+                    "paths": [
+                      {
+                        "path": "/",
+                        "pathType": "Prefix"
+                      }
+                    ]
+                  }
+                ],
+                "ingressClassName": "nginx",
+                "tls": [
+                  {
+                    "hosts": [
+                      "immich.example.com"
+                    ],
+                    "secretName": "immich-tls"
+                  }
+                ]
+              },
+              "replicas": 1,
+              "resources": {
+                "limits": {
+                  "memory": "2Gi"
+                },
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "256Mi"
+                }
+              }
+            },
+            "valkey": {
+              "enabled": true,
+              "persistence": {
+                "enabled": false,
+                "size": "1Gi"
+              },
+              "resources": {
+                "limits": {
+                  "memory": "256Mi"
+                },
+                "requests": {
+                  "cpu": "50m",
+                  "memory": "64Mi"
+                }
+              }
+            }
+          }
+        }
+      ]
+    capabilities: Basic Install
+    createdAt: "2025-12-26T10:21:42Z"
+    operators.operatorframework.io/builder: operator-sdk-v1.42.0
+    operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
+  name: immich-operator.v0.0.1
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: Immich is the Schema for the immiches API.
+      displayName: Immich
+      kind: Immich
+      name: immiches.media.rm3l.org
+      version: v1alpha1
+  description: A Kubernetes Operator for deploying and managing Immich - a high-performance,
+    self-hosted photo and video management solution
+  displayName: Immich Operator
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      clusterPermissions:
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          - persistentvolumeclaims
+          - secrets
+          - services
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - media.rm3l.org
+          resources:
+          - immiches
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - media.rm3l.org
+          resources:
+          - immiches/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - media.rm3l.org
+          resources:
+          - immiches/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - servicemonitors
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - networking.k8s.io
+          resources:
+          - ingresses
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - authentication.k8s.io
+          resources:
+          - tokenreviews
+          verbs:
+          - create
+        - apiGroups:
+          - authorization.k8s.io
+          resources:
+          - subjectaccessreviews
+          verbs:
+          - create
+        serviceAccountName: immich-operator-controller-manager
+      deployments:
+      - label:
+          app.kubernetes.io/managed-by: kustomize
+          app.kubernetes.io/name: immich-operator
+          control-plane: controller-manager
+        name: immich-operator-controller-manager
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app.kubernetes.io/name: immich-operator
+              control-plane: controller-manager
+          strategy: {}
+          template:
+            metadata:
+              annotations:
+                kubectl.kubernetes.io/default-container: manager
+              labels:
+                app.kubernetes.io/name: immich-operator
+                control-plane: controller-manager
+            spec:
+              containers:
+              - args:
+                - --metrics-bind-address=:8443
+                - --leader-elect
+                - --health-probe-bind-address=:8081
+                command:
+                - /manager
+                image: controller:latest
+                livenessProbe:
+                  httpGet:
+                    path: /healthz
+                    port: 8081
+                  initialDelaySeconds: 15
+                  periodSeconds: 20
+                name: manager
+                readinessProbe:
+                  httpGet:
+                    path: /readyz
+                    port: 8081
+                  initialDelaySeconds: 5
+                  periodSeconds: 10
+                resources:
+                  limits:
+                    cpu: 500m
+                    memory: 128Mi
+                  requests:
+                    cpu: 10m
+                    memory: 64Mi
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                    - ALL
+              securityContext:
+                runAsNonRoot: true
+                seccompProfile:
+                  type: RuntimeDefault
+              serviceAccountName: immich-operator-controller-manager
+              terminationGracePeriodSeconds: 10
+      permissions:
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - coordination.k8s.io
+          resources:
+          - leases
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - ""
+          resources:
+          - events
+          verbs:
+          - create
+          - patch
+        serviceAccountName: immich-operator-controller-manager
+    strategy: deployment
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - immich
+  - photo
+  - video
+  - self-hosting
+  - album
+  links:
+  - name: Immich Operator
+    url: https://github.com/rm3l/immich-operator
+  maintainers:
+  - email: armel@rm3l.org
+    name: Armel Soro
+  maturity: alpha
+  provider:
+    name: Armel Soro
+    url: https://armel.soro.io
+  version: 0.0.1
