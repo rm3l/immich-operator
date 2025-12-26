@@ -6,4 +6,96 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: immich-sample
 spec:
-  # TODO(user): Add fields here
+  # Global image configuration
+  image:
+    tag: v1.125.7
+    pullPolicy: IfNotPresent
+
+  # Immich shared configuration
+  immich:
+    # Enable Prometheus metrics
+    metrics:
+      enabled: false
+
+    # Persistence configuration for photo library
+    persistence:
+      library:
+        # You must create this PVC manually or use an existing one
+        existingClaim: immich-library
+
+    # Immich configuration file (converted to YAML)
+    # ref: https://immich.app/docs/install/config-file/
+    configuration:
+      trash:
+        enabled: true
+        days: 30
+      storageTemplate:
+        enabled: true
+        template: "{{y}}/{{y}}-{{MM}}-{{dd}}/{{filename}}"
+
+    # Store configuration in ConfigMap (or "Secret" for sensitive data)
+    configurationKind: ConfigMap
+
+  # PostgreSQL database configuration
+  postgres:
+    host: postgres.database.svc.cluster.local
+    port: 5432
+    database: immich
+    username: immich
+    # Use a secret reference for the password (recommended)
+    passwordSecretRef:
+      name: immich-postgres
+      key: password
+
+  # Server component configuration
+  server:
+    enabled: true
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 2Gi
+    ingress:
+      enabled: true
+      ingressClassName: nginx
+      annotations:
+        nginx.ingress.kubernetes.io/proxy-body-size: "0"
+      hosts:
+        - host: immich.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+      tls:
+        - hosts:
+            - immich.example.com
+          secretName: immich-tls
+
+  # Machine Learning component configuration
+  machineLearning:
+    enabled: true
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        memory: 4Gi
+    persistence:
+      enabled: true
+      size: 10Gi
+      # storageClass: standard
+
+  # Valkey (Redis) component configuration
+  valkey:
+    enabled: true
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+    persistence:
+      enabled: false  # Set to true for persistent job queues
+      size: 1Gi

@@ -1,27 +1,42 @@
-# immich-operator-v2
-// TODO(user): Add simple overview of use/purpose
+# Immich Operator
+
+A Kubernetes Operator for deploying and managing [Immich](https://immich.app/) - a high-performance, self-hosted photo and video management solution.
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+
+This operator automates the deployment and lifecycle management of Immich on Kubernetes. It works similarly to the [official Immich Helm chart](https://github.com/immich-app/immich-charts/tree/main/charts/immich), but as a native Kubernetes operator with the following benefits:
+
+- **Declarative Configuration**: Define your Immich deployment as a Kubernetes Custom Resource
+- **Automated Reconciliation**: The operator continuously ensures the actual state matches your desired state
+- **Simplified Operations**: Single CR to manage all Immich components
+- **Native Kubernetes Integration**: Works with kubectl, GitOps tools, and Kubernetes RBAC
+
+### Components Managed
+
+The operator manages the following Immich components:
+
+- **Server**: The main Immich application server (handles web UI, API, and background jobs)
+- **Machine Learning**: AI/ML service for smart search, face detection, and duplicate detection
+- **Valkey**: Redis-compatible cache for job queues (optional, can use external Redis)
+
+### Prerequisites
+
+External dependencies you need to provide:
+
+- **PostgreSQL Database**: With the `pgvecto.rs` extension installed
+- **Persistent Storage**: A PVC for storing photos and videos
 
 ## Getting Started
 
 ### Prerequisites
-- go version v1.24.0+
-- docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
 
-### To Deploy on the cluster
-**Build and push your image to the location specified by `IMG`:**
+- Go version v1.24.0+
+- Docker version 17.03+
+- kubectl version v1.11.3+
+- Access to a Kubernetes v1.11.3+ cluster
+- A PostgreSQL database with `pgvecto.rs` extension
 
-```sh
-make docker-build docker-push IMG=<some-registry>/immich-operator-v2:tag
-```
-
-**NOTE:** This image ought to be published in the personal registry you specified.
-And it is required to have access to pull the image from the working environment.
-Make sure you have the proper permission to the registry if the above commands don’t work.
+### Installation
 
 **Install the CRDs into the cluster:**
 
@@ -29,93 +44,271 @@ Make sure you have the proper permission to the registry if the above commands d
 make install
 ```
 
-**Deploy the Manager to the cluster with the image specified by `IMG`:**
+**Deploy the operator to the cluster:**
 
 ```sh
-make deploy IMG=<some-registry>/immich-operator-v2:tag
+make deploy IMG=<some-registry>/immich-operator:tag
 ```
 
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
-privileges or be logged in as admin.
+### Quick Start
 
-**Create instances of your solution**
-You can apply the samples (examples) from the config/sample:
+1. **Create a namespace for Immich:**
 
 ```sh
-kubectl apply -k config/samples/
+kubectl create namespace immich
 ```
 
->**NOTE**: Ensure that the samples has default values to test it out.
-
-### To Uninstall
-**Delete the instances (CRs) from the cluster:**
+2. **Create a secret for the PostgreSQL password:**
 
 ```sh
-kubectl delete -k config/samples/
+kubectl create secret generic immich-postgres \
+  --namespace immich \
+  --from-literal=password=your-postgres-password
 ```
 
-**Delete the APIs(CRDs) from the cluster:**
+3. **Create a PVC for the photo library:**
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: immich-library
+  namespace: immich
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+```
+
+4. **Deploy Immich:**
+
+```yaml
+apiVersion: media.rm3l.org/v1alpha1
+kind: Immich
+metadata:
+  name: immich
+  namespace: immich
+spec:
+  image:
+    tag: v1.125.7
+
+  postgres:
+    host: postgres.database.svc.cluster.local
+    database: immich
+    username: immich
+    passwordSecretRef:
+      name: immich-postgres
+      key: password
+
+  immich:
+    persistence:
+      library:
+        existingClaim: immich-library
+
+  server:
+    enabled: true
+    ingress:
+      enabled: true
+      ingressClassName: nginx
+      annotations:
+        nginx.ingress.kubernetes.io/proxy-body-size: "0"
+      hosts:
+        - host: immich.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+
+  machineLearning:
+    enabled: true
+    persistence:
+      enabled: true
+      size: 10Gi
+
+  valkey:
+    enabled: true
+```
+
+## Configuration Reference
+
+### ImmichSpec
+
+| Field | Description | Default |
+|-------|-------------|---------|
+| `image.tag` | Immich version tag | `v1.125.7` |
+| `image.pullPolicy` | Image pull policy | `IfNotPresent` |
+| `image.pullSecrets` | Image pull secrets | `[]` |
+
+### PostgreSQL Configuration
+
+| Field | Description | Default |
+|-------|-------------|---------|
+| `postgres.host` | PostgreSQL hostname | Required |
+| `postgres.port` | PostgreSQL port | `5432` |
+| `postgres.database` | Database name | `immich` |
+| `postgres.username` | Database username | `immich` |
+| `postgres.password` | Database password (plain text) | - |
+| `postgres.passwordSecretRef.name` | Secret name containing password | - |
+| `postgres.passwordSecretRef.key` | Key in the secret | - |
+| `postgres.urlSecretRef.name` | Secret containing full DATABASE_URL | - |
+
+### Immich Configuration
+
+| Field | Description | Default |
+|-------|-------------|---------|
+| `immich.metrics.enabled` | Enable Prometheus metrics | `false` |
+| `immich.persistence.library.existingClaim` | PVC name for photo storage | Required |
+| `immich.configuration` | Immich config file (YAML) | `{}` |
+| `immich.configurationKind` | ConfigMap or Secret | `ConfigMap` |
+
+### Server Configuration
+
+| Field | Description | Default |
+|-------|-------------|---------|
+| `server.enabled` | Enable server component | `true` |
+| `server.replicas` | Number of replicas | `1` |
+| `server.resources` | Resource requirements | `{}` |
+| `server.ingress.enabled` | Enable ingress | `false` |
+| `server.ingress.ingressClassName` | Ingress class | - |
+| `server.ingress.hosts` | Ingress hosts | `[]` |
+| `server.ingress.tls` | Ingress TLS configuration | `[]` |
+
+### Machine Learning Configuration
+
+| Field | Description | Default |
+|-------|-------------|---------|
+| `machineLearning.enabled` | Enable ML component | `true` |
+| `machineLearning.replicas` | Number of replicas | `1` |
+| `machineLearning.resources` | Resource requirements | `{}` |
+| `machineLearning.persistence.enabled` | Enable cache persistence | `true` |
+| `machineLearning.persistence.size` | Cache PVC size | `10Gi` |
+
+### Valkey (Redis) Configuration
+
+| Field | Description | Default |
+|-------|-------------|---------|
+| `valkey.enabled` | Enable built-in Valkey | `true` |
+| `valkey.resources` | Resource requirements | `{}` |
+| `valkey.persistence.enabled` | Enable data persistence | `false` |
+| `valkey.persistence.size` | Data PVC size | `1Gi` |
+
+### Immich Application Configuration
+
+The `immich.configuration` field accepts Immich's native configuration format. Example:
+
+```yaml
+immich:
+  configuration:
+    trash:
+      enabled: true
+      days: 30
+    storageTemplate:
+      enabled: true
+      template: "{{y}}/{{y}}-{{MM}}-{{dd}}/{{filename}}"
+    ffmpeg:
+      crf: 23
+      preset: "medium"
+      targetVideoCodec: "h264"
+    machineLearning:
+      enabled: true
+      clip:
+        enabled: true
+        modelName: "ViT-B-32__openai"
+      facialRecognition:
+        enabled: true
+        modelName: "buffalo_l"
+```
+
+See the [Immich configuration documentation](https://immich.app/docs/install/config-file/) for all available options.
+
+## Using External Redis
+
+To use an external Redis/Valkey instance instead of the built-in one:
+
+```yaml
+spec:
+  valkey:
+    enabled: false
+  server:
+    env:
+      - name: REDIS_HOSTNAME
+        value: redis.external.svc.cluster.local
+      - name: REDIS_PORT
+        value: "6379"
+```
+
+## Status
+
+The operator reports status through the `status` field:
+
+```yaml
+status:
+  ready: true
+  serverReady: true
+  machineLearningReady: true
+  valkeyReady: true
+  version: v1.125.7
+  conditions:
+    - type: Ready
+      status: "True"
+      reason: AllComponentsReady
+      message: All Immich components are ready
+```
+
+View status with:
+
+```sh
+kubectl get immich
+NAME     READY   VERSION    AGE
+immich   true    v1.125.7   5m
+```
+
+## Uninstall
+
+**Delete Immich instances:**
+
+```sh
+kubectl delete immich --all -A
+```
+
+**Delete the CRDs:**
 
 ```sh
 make uninstall
 ```
 
-**UnDeploy the controller from the cluster:**
+**Undeploy the operator:**
 
 ```sh
 make undeploy
 ```
 
-## Project Distribution
+## Development
 
-Following the options to release and provide this solution to the users.
-
-### By providing a bundle with all YAML files
-
-1. Build the installer for the image built and published in the registry:
+### Running Locally
 
 ```sh
-make build-installer IMG=<some-registry>/immich-operator-v2:tag
+make install      # Install CRDs
+make run          # Run controller locally
 ```
 
-**NOTE:** The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without its
-dependencies.
-
-2. Using the installer
-
-Users can just run 'kubectl apply -f <URL for YAML BUNDLE>' to install
-the project, i.e.:
+### Running Tests
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/immich-operator-v2/<tag or branch>/dist/install.yaml
+make test
 ```
 
-### By providing a Helm Chart
-
-1. Build the chart using the optional helm plugin
+### Building
 
 ```sh
-operator-sdk edit --plugins=helm/v1-alpha
+make build                                    # Build binary
+make docker-build IMG=myregistry/immich-operator:tag  # Build container
 ```
-
-2. See that a chart was generated under 'dist/chart', and users
-can obtain this solution from there.
-
-**NOTE:** If you change the project, you need to update the Helm Chart
-using the same command above to sync the latest changes. Furthermore,
-if you create webhooks, you need to use the above command with
-the '--force' flag and manually ensure that any custom configuration
-previously added to 'dist/chart/values.yaml' or 'dist/chart/manager/manager.yaml'
-is manually re-applied afterwards.
 
 ## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
 
-**NOTE:** Run `make help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
@@ -132,4 +325,3 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-

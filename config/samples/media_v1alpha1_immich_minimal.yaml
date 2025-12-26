@@ -1,0 +1,30 @@
+apiVersion: media.rm3l.org/v1alpha1
+kind: Immich
+metadata:
+  name: immich-minimal
+spec:
+  # Minimal configuration - requires:
+  # 1. A PostgreSQL database
+  # 2. A PVC for the photo library
+
+  # PostgreSQL database configuration (required)
+  postgres:
+    host: postgres
+    passwordSecretRef:
+      name: immich-postgres
+      key: password
+
+  # Photo library storage (required)
+  immich:
+    persistence:
+      library:
+        existingClaim: immich-library
+
+  # Use built-in Valkey for Redis
+  valkey:
+    enabled: true
+
+  # Enable Machine Learning for smart search and face detection
+  machineLearning:
+    enabled: true
+
