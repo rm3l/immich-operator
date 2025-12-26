@@ -137,12 +137,12 @@ spec:
 
 ### Image Configuration
 
-**Images are required** for each enabled component. They can be specified via:
+Images are resolved in the following order:
 
-1. **CR spec** (highest priority) - user-specified in the Custom Resource
-2. **Environment variables** (fallback) - `RELATED_IMAGE_*` for disconnected environments
+1. **CR spec** (highest priority) - if specified in the Custom Resource
+2. **Environment variables** (default) - `RELATED_IMAGE_*` set on the operator deployment
 
-If neither is set for an enabled component, the operator will report an error.
+The operator comes with default images configured via `RELATED_IMAGE_*` environment variables, so you don't need to specify images in the CR unless you want to override them.
 
 #### Global Image Settings
 
@@ -152,20 +152,20 @@ If neither is set for an enabled component, the operator will report an error.
 
 #### Per-Component Image Settings
 
-Each component (server, machineLearning, valkey) requires:
+Each component (server, machineLearning, valkey) supports optional image configuration:
 
 | Field | Description |
 |-------|-------------|
-| `<component>.image.image` | **Required.** Full image reference (e.g., `ghcr.io/immich-app/immich-server:v1.125.7`) |
+| `<component>.image.image` | Full image reference to override the default |
 | `<component>.image.pullPolicy` | Pull policy override for this component |
 
-#### Example: Specifying Images
+#### Example: Overriding Images
 
 ```yaml
 spec:
   server:
     image:
-      image: ghcr.io/immich-app/immich-server:v1.125.7
+      image: my-registry.example.com/immich-server:v1.125.7
   machineLearning:
     image:
       image: ghcr.io/immich-app/immich-machine-learning:v1.125.7
@@ -225,7 +225,7 @@ env:
 | Field | Description | Default |
 |-------|-------------|---------|
 | `server.enabled` | Enable server component | `true` |
-| `server.image.image` | **Required.** Full image reference | - |
+| `server.image.image` | Override default image | `RELATED_IMAGE_immich` |
 | `server.replicas` | Number of replicas | `1` |
 | `server.resources` | Resource requirements | `{}` |
 | `server.ingress.enabled` | Enable ingress | `false` |
@@ -238,7 +238,7 @@ env:
 | Field | Description | Default |
 |-------|-------------|---------|
 | `machineLearning.enabled` | Enable ML component | `true` |
-| `machineLearning.image.image` | **Required.** Full image reference | - |
+| `machineLearning.image.image` | Override default image | `RELATED_IMAGE_machineLearning` |
 | `machineLearning.replicas` | Number of replicas | `1` |
 | `machineLearning.resources` | Resource requirements | `{}` |
 | `machineLearning.persistence.enabled` | Enable cache persistence | `true` |
@@ -249,7 +249,7 @@ env:
 | Field | Description | Default |
 |-------|-------------|---------|
 | `valkey.enabled` | Enable built-in Valkey | `true` |
-| `valkey.image.image` | **Required.** Full image reference | - |
+| `valkey.image.image` | Override default image | `RELATED_IMAGE_valkey` |
 | `valkey.resources` | Resource requirements | `{}` |
 | `valkey.persistence.enabled` | Enable data persistence | `false` |
 | `valkey.persistence.size` | Data PVC size | `1Gi` |
