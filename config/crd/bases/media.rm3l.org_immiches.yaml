@@ -408,10 +408,33 @@ spec:
                       library:
                         description: Library persistence configuration for photo storage
                         properties:
+                          accessModes:
+                            default:
+                            - ReadWriteOnce
+                            description: |-
+                              AccessModes for the PVC.
+                              Only used if existingClaim is not set.
+                            items:
+                              type: string
+                            type: array
                           existingClaim:
                             description: |-
-                              ExistingClaim is the name of an existing PVC to use for library storage
-                              This is required - the operator does not auto-create the library PVC
+                              ExistingClaim is the name of an existing PVC to use for library storage.
+                              If set, the operator will use this PVC instead of creating a new one.
+                            type: string
+                          size:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            description: |-
+                              Size of the PVC to create for library storage.
+                              Only used if existingClaim is not set.
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                          storageClass:
+                            description: |-
+                              StorageClass for the PVC. If not set, the default storage class is used.
+                              Only used if existingClaim is not set.
                             type: string
                         type: object
                     type: object

@@ -19,8 +19,13 @@ spec:
     # Persistence configuration for photo library
     persistence:
       library:
-        # You must create this PVC manually or use an existing one
-        existingClaim: immich-library
+        # Option 1: Let the operator create and manage the PVC
+        size: 100Gi
+        # storageClass: my-storage-class  # optional
+        # accessModes: ["ReadWriteOnce"]  # optional
+        
+        # Option 2: Use an existing PVC (comment out size above and uncomment below)
+        # existingClaim: my-existing-pvc
 
     # Immich configuration file (converted to YAML)
     # ref: https://immich.app/docs/install/config-file/

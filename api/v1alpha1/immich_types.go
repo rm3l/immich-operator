@@ -347,10 +347,28 @@ type PersistenceSpec struct {
 }
 
 // LibraryPersistenceSpec defines library persistence configuration.
+// Either use an existing PVC (existingClaim) or let the operator create one (size).
 type LibraryPersistenceSpec struct {
-	// ExistingClaim is the name of an existing PVC to use for library storage
-	// This is required - the operator does not auto-create the library PVC
+	// ExistingClaim is the name of an existing PVC to use for library storage.
+	// If set, the operator will use this PVC instead of creating a new one.
+	// +optional
 	ExistingClaim string `json:"existingClaim,omitempty"`
+
+	// Size of the PVC to create for library storage.
+	// Only used if existingClaim is not set.
+	// +optional
+	Size resource.Quantity `json:"size,omitempty"`
+
+	// StorageClass for the PVC. If not set, the default storage class is used.
+	// Only used if existingClaim is not set.
+	// +optional
+	StorageClass string `json:"storageClass,omitempty"`
+
+	// AccessModes for the PVC.
+	// Only used if existingClaim is not set.
+	// +kubebuilder:default={"ReadWriteOnce"}
+	// +optional
+	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
 }
 
 // ServerSpec defines the server component configuration.
@@ -804,4 +822,29 @@ func (i *Immich) GetValkeyImage() string {
 
 	// Fall back to environment variable (disconnected/air-gapped support)
 	return os.Getenv(EnvRelatedImageValkey)
+}
+
+// GetLibraryPVCName returns the name of the PVC to use for the photo library.
+// Returns the existingClaim if set, otherwise generates a name based on the Immich resource name.
+func (i *Immich) GetLibraryPVCName() string {
+	if i.Spec.Immich.Persistence.Library.ExistingClaim != "" {
+		return i.Spec.Immich.Persistence.Library.ExistingClaim
+	}
+	return i.Name + "-library"
+}
+
+// ShouldCreateLibraryPVC returns true if the operator should create a PVC for the library.
+// This is true when existingClaim is not set but size is configured.
+func (i *Immich) ShouldCreateLibraryPVC() bool {
+	return i.Spec.Immich.Persistence.Library.ExistingClaim == "" &&
+		!i.Spec.Immich.Persistence.Library.Size.IsZero()
+}
+
+// GetLibraryAccessModes returns the access modes for the library PVC.
+// Defaults to ReadWriteOnce if not specified.
+func (i *Immich) GetLibraryAccessModes() []corev1.PersistentVolumeAccessMode {
+	if len(i.Spec.Immich.Persistence.Library.AccessModes) > 0 {
+		return i.Spec.Immich.Persistence.Library.AccessModes
+	}
+	return []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
 }

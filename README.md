@@ -66,23 +66,7 @@ kubectl create secret generic immich-postgres \
   --from-literal=password=your-postgres-password
 ```
 
-3. **Create a PVC for the photo library:**
-
-```yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: immich-library
-  namespace: immich
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 100Gi
-```
-
-4. **Deploy Immich:**
+3. **Deploy Immich:**
 
 ```yaml
 apiVersion: media.rm3l.org/v1alpha1
@@ -102,12 +86,9 @@ spec:
   immich:
     persistence:
       library:
-        existingClaim: immich-library
+        size: 100Gi  # Operator creates and manages the PVC
 
   server:
-    enabled: true
-    image:
-      image: ghcr.io/immich-app/immich-server:v1.125.7
     ingress:
       enabled: true
       ingressClassName: nginx
@@ -120,18 +101,13 @@ spec:
               pathType: Prefix
 
   machineLearning:
-    enabled: true
-    image:
-      image: ghcr.io/immich-app/immich-machine-learning:v1.125.7
     persistence:
       enabled: true
       size: 10Gi
-
-  valkey:
-    enabled: true
-    image:
-      image: docker.io/valkey/valkey:8-alpine
 ```
+
+> **Note:** Images are provided by default via `RELATED_IMAGE_*` environment variables on the operator.
+> You only need to specify images in the CR if you want to override them.
 
 ## Configuration Reference
 
@@ -216,7 +192,10 @@ env:
 | Field | Description | Default |
 |-------|-------------|---------|
 | `immich.metrics.enabled` | Enable Prometheus metrics | `false` |
-| `immich.persistence.library.existingClaim` | PVC name for photo storage | Required |
+| `immich.persistence.library.existingClaim` | Use an existing PVC for photo storage | - |
+| `immich.persistence.library.size` | Size of PVC to create (if existingClaim not set) | - |
+| `immich.persistence.library.storageClass` | Storage class for managed PVC | (default) |
+| `immich.persistence.library.accessModes` | Access modes for managed PVC | `["ReadWriteOnce"]` |
 | `immich.configuration` | Immich config file (YAML) | `{}` |
 | `immich.configurationKind` | ConfigMap or Secret | `ConfigMap` |
 
@@ -283,6 +262,40 @@ immich:
 
 See the [Immich configuration documentation](https://immich.app/docs/install/config-file/) for all available options.
 
+### Library Persistence
+
+The photo library requires persistent storage. You can configure this in two ways:
+
+**Option 1: Operator-managed PVC** (good for quick testig)
+
+Let the operator create and manage the PVC:
+
+```yaml
+spec:
+  immich:
+    persistence:
+      library:
+        size: 100Gi
+        storageClass: my-storage-class  # optional, uses default if not set
+        accessModes: ["ReadWriteOnce"]  # optional, defaults to ReadWriteOnce
+```
+
+The operator creates a PVC named `<immich-name>-library` that is owned by the Immich CR and will be deleted when the CR is deleted.
+
+**Option 2: Existing PVC** (recommended)
+
+Use a pre-existing PVC that you manage yourself:
+
+```yaml
+spec:
+  immich:
+    persistence:
+      library:
+        existingClaim: my-existing-pvc
+```
+
+This is useful when you want the PVC to persist beyond the lifecycle of the Immich CR, or when you have specific storage requirements.
+
 ## Using External Redis
 
 To use an external Redis/Valkey instance instead of the built-in one:
@@ -309,7 +322,6 @@ status:
   serverReady: true
   machineLearningReady: true
   valkeyReady: true
-  version: v1.125.7
   conditions:
     - type: Ready
       status: "True"
@@ -321,8 +333,8 @@ View status with:
 
 ```sh
 kubectl get immich
-NAME     READY   VERSION    AGE
-immich   true    v1.125.7   5m
+NAME     READY   AGE
+immich   true    5m
 ```
 
 ## Uninstall

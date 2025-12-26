@@ -5,7 +5,7 @@ metadata:
 spec:
   # Minimal configuration - requires:
   # 1. A PostgreSQL database
-  # 2. A PVC for the photo library
+  # 2. Storage for the photo library (either existing PVC or operator-managed)
   # Images are provided by the operator via RELATED_IMAGE_* env vars
 
   # PostgreSQL database configuration (required)
@@ -15,8 +15,16 @@ spec:
       name: immich-postgres
       key: password
 
-  # Photo library storage (required)
+  # Photo library storage - Option 1: Let the operator create a PVC
   immich:
     persistence:
       library:
-        existingClaim: immich-library
+        size: 100Gi
+        # storageClass: my-storage-class  # optional, uses default if not set
+        # accessModes: ["ReadWriteOnce"]  # optional, defaults to ReadWriteOnce
+
+  # Photo library storage - Option 2: Use an existing PVC (uncomment to use)
+  # immich:
+  #   persistence:
+  #     library:
+  #       existingClaim: my-existing-pvc

@@ -149,13 +149,21 @@ func (r *ImmichReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// Reconcile all components
 	var reconcileErr error
 
-	// 1. Reconcile Immich configuration (ConfigMap/Secret)
+	// 1. Reconcile Library PVC if needed
+	if immich.ShouldCreateLibraryPVC() {
+		if err := r.reconcileLibraryPVC(ctx, immich); err != nil {
+			log.Error(err, "Failed to reconcile Library PVC")
+			reconcileErr = err
+		}
+	}
+
+	// 2. Reconcile Immich configuration (ConfigMap/Secret)
 	if err := r.reconcileImmichConfig(ctx, immich); err != nil {
 		log.Error(err, "Failed to reconcile Immich config")
 		reconcileErr = err
 	}
 
-	// 2. Reconcile Valkey if enabled
+	// 4. Reconcile Valkey if enabled
 	if immich.IsValkeyEnabled() {
 		if err := r.reconcileValkey(ctx, immich); err != nil {
 			log.Error(err, "Failed to reconcile Valkey")
@@ -163,7 +171,7 @@ func (r *ImmichReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}
 
-	// 3. Reconcile Machine Learning if enabled
+	// 5. Reconcile Machine Learning if enabled
 	if immich.IsMachineLearningEnabled() {
 		if err := r.reconcileMachineLearning(ctx, immich); err != nil {
 			log.Error(err, "Failed to reconcile Machine Learning")
@@ -171,7 +179,7 @@ func (r *ImmichReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}
 
-	// 4. Reconcile Server if enabled
+	// 6. Reconcile Server if enabled
 	if immich.IsServerEnabled() {
 		if err := r.reconcileServer(ctx, immich); err != nil {
 			log.Error(err, "Failed to reconcile Server")
@@ -293,6 +301,58 @@ func (r *ImmichReconciler) reconcileImmichConfig(ctx context.Context, immich *me
 		}
 		return nil
 	})
+}
+
+// reconcileLibraryPVC creates the PVC for the photo library if needed
+func (r *ImmichReconciler) reconcileLibraryPVC(ctx context.Context, immich *mediav1alpha1.Immich) error {
+	log := logf.FromContext(ctx)
+	log.Info("Reconciling Library PVC")
+
+	name := immich.GetLibraryPVCName()
+	labels := r.getLabels(immich, "library")
+
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: immich.Namespace,
+			Labels:    labels,
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(immich, pvc, r.Scheme); err != nil {
+		return err
+	}
+
+	// Check if PVC already exists - we can't update it
+	existing := &corev1.PersistentVolumeClaim{}
+	err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: immich.Namespace}, existing)
+	if err == nil {
+		// PVC exists, don't update
+		log.Info("Library PVC already exists", "name", name)
+		return nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	// Create new PVC
+	var storageClassName *string
+	if immich.Spec.Immich.Persistence.Library.StorageClass != "" {
+		storageClassName = &immich.Spec.Immich.Persistence.Library.StorageClass
+	}
+
+	pvc.Spec = corev1.PersistentVolumeClaimSpec{
+		AccessModes:      immich.GetLibraryAccessModes(),
+		StorageClassName: storageClassName,
+		Resources: corev1.VolumeResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceStorage: immich.Spec.Immich.Persistence.Library.Size,
+			},
+		},
+	}
+
+	log.Info("Creating Library PVC", "name", name, "size", immich.Spec.Immich.Persistence.Library.Size.String())
+	return r.Create(ctx, pvc)
 }
 
 // reconcileValkey creates or updates the Valkey (Redis) deployment and service
@@ -1060,8 +1120,8 @@ func (r *ImmichReconciler) getServerEnv(immich *mediav1alpha1.Immich) []corev1.E
 func (r *ImmichReconciler) getServerVolumeMounts(immich *mediav1alpha1.Immich) []corev1.VolumeMount {
 	mounts := []corev1.VolumeMount{}
 
-	// Library mount
-	if immich.Spec.Immich.Persistence.Library.ExistingClaim != "" {
+	// Library mount (when using existing PVC or operator-managed PVC)
+	if immich.Spec.Immich.Persistence.Library.ExistingClaim != "" || immich.ShouldCreateLibraryPVC() {
 		mounts = append(mounts, corev1.VolumeMount{
 			Name:      "library",
 			MountPath: "/usr/src/app/upload",
@@ -1083,13 +1143,13 @@ func (r *ImmichReconciler) getServerVolumeMounts(immich *mediav1alpha1.Immich) [
 func (r *ImmichReconciler) getServerVolumes(immich *mediav1alpha1.Immich) []corev1.Volume {
 	volumes := []corev1.Volume{}
 
-	// Library volume
-	if immich.Spec.Immich.Persistence.Library.ExistingClaim != "" {
+	// Library volume (when using existing PVC or operator-managed PVC)
+	if immich.Spec.Immich.Persistence.Library.ExistingClaim != "" || immich.ShouldCreateLibraryPVC() {
 		volumes = append(volumes, corev1.Volume{
 			Name: "library",
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: immich.Spec.Immich.Persistence.Library.ExistingClaim,
+					ClaimName: immich.GetLibraryPVCName(),
 				},
 			},
 		})
