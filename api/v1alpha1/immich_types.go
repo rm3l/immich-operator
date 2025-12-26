@@ -17,16 +17,26 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"os"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// Environment variable names for disconnected/air-gapped environments
+// These follow the RELATED_IMAGE_* pattern used by OpenShift OLM
+const (
+	EnvRelatedImageImmich          = "RELATED_IMAGE_immich"
+	EnvRelatedImageMachineLearning = "RELATED_IMAGE_machineLearning"
+	EnvRelatedImageValkey          = "RELATED_IMAGE_valkey"
+)
+
 // ImmichSpec defines the desired state of Immich.
 type ImmichSpec struct {
-	// Image configuration shared across components
+	// ImagePullSecrets are the secrets used to pull images from private registries
 	// +optional
-	Image ImageSpec `json:"image,omitempty"`
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 
 	// Immich shared configuration
 	// +optional
@@ -47,23 +57,6 @@ type ImmichSpec struct {
 	// PostgreSQL database configuration
 	// +optional
 	Postgres PostgresSpec `json:"postgres,omitempty"`
-}
-
-// ImageSpec defines container image configuration.
-type ImageSpec struct {
-	// Image tag to use for all Immich components (unless overridden)
-	// +kubebuilder:default="v1.125.7"
-	// +optional
-	Tag string `json:"tag,omitempty"`
-
-	// Image pull policy
-	// +kubebuilder:default="IfNotPresent"
-	// +optional
-	PullPolicy corev1.PullPolicy `json:"pullPolicy,omitempty"`
-
-	// Image pull secrets
-	// +optional
-	PullSecrets []corev1.LocalObjectReference `json:"pullSecrets,omitempty"`
 }
 
 // ImmichConfig defines shared Immich configuration.
@@ -625,15 +618,11 @@ type SecretKeySelector struct {
 
 // ComponentImageSpec defines image configuration for a specific component.
 type ComponentImageSpec struct {
-	// Repository for the image (overrides default)
+	// Image is the full image reference (e.g., "ghcr.io/immich-app/immich-server:v1.125.7")
 	// +optional
-	Repository string `json:"repository,omitempty"`
+	Image string `json:"image,omitempty"`
 
-	// Tag for the image (overrides default)
-	// +optional
-	Tag string `json:"tag,omitempty"`
-
-	// Pull policy (overrides default)
+	// PullPolicy overrides the default pull policy for this component
 	// +optional
 	PullPolicy corev1.PullPolicy `json:"pullPolicy,omitempty"`
 }
@@ -717,16 +706,11 @@ type ImmichStatus struct {
 	// ObservedGeneration is the last observed generation
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-
-	// Version of Immich currently deployed
-	// +optional
-	Version string `json:"version,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Ready",type="boolean",JSONPath=".status.ready",description="Whether all components are ready"
-// +kubebuilder:printcolumn:name="Version",type="string",JSONPath=".status.version",description="Immich version"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Immich is the Schema for the immiches API.
@@ -777,57 +761,47 @@ func (i *Immich) IsValkeyEnabled() bool {
 	return *i.Spec.Valkey.Enabled
 }
 
-// GetImageTag returns the image tag to use
-func (i *Immich) GetImageTag() string {
-	if i.Spec.Image.Tag != "" {
-		return i.Spec.Image.Tag
-	}
-	return "v1.125.7"
-}
-
 // GetServerImage returns the full server image reference
+// Priority order:
+// 1. spec.server.image.image (user-specified in CR takes precedence)
+// 2. RELATED_IMAGE_IMMICH environment variable (for disconnected environments)
+// Returns empty string if neither is set (caller should handle as error)
 func (i *Immich) GetServerImage() string {
-	repo := "ghcr.io/immich-app/immich-server"
-	if i.Spec.Server.Image.Repository != "" {
-		repo = i.Spec.Server.Image.Repository
+	// User-specified image takes precedence
+	if i.Spec.Server.Image.Image != "" {
+		return i.Spec.Server.Image.Image
 	}
-	tag := i.GetImageTag()
-	if i.Spec.Server.Image.Tag != "" {
-		tag = i.Spec.Server.Image.Tag
-	}
-	return repo + ":" + tag
+
+	// Fall back to environment variable (disconnected/air-gapped support)
+	return os.Getenv(EnvRelatedImageImmich)
 }
 
 // GetMachineLearningImage returns the full ML image reference
+// Priority order:
+// 1. spec.machineLearning.image.image (user-specified in CR takes precedence)
+// 2. RELATED_IMAGE_MACHINE_LEARNING environment variable (for disconnected environments)
+// Returns empty string if neither is set (caller should handle as error)
 func (i *Immich) GetMachineLearningImage() string {
-	repo := "ghcr.io/immich-app/immich-machine-learning"
-	if i.Spec.MachineLearning.Image.Repository != "" {
-		repo = i.Spec.MachineLearning.Image.Repository
+	// User-specified image takes precedence
+	if i.Spec.MachineLearning.Image.Image != "" {
+		return i.Spec.MachineLearning.Image.Image
 	}
-	tag := i.GetImageTag()
-	if i.Spec.MachineLearning.Image.Tag != "" {
-		tag = i.Spec.MachineLearning.Image.Tag
-	}
-	return repo + ":" + tag
+
+	// Fall back to environment variable (disconnected/air-gapped support)
+	return os.Getenv(EnvRelatedImageMachineLearning)
 }
 
 // GetValkeyImage returns the full Valkey image reference
+// Priority order:
+// 1. spec.valkey.image.image (user-specified in CR takes precedence)
+// 2. RELATED_IMAGE_VALKEY environment variable (for disconnected environments)
+// Returns empty string if neither is set (caller should handle as error)
 func (i *Immich) GetValkeyImage() string {
-	repo := "docker.io/valkey/valkey"
-	tag := "8-alpine"
-	if i.Spec.Valkey.Image.Repository != "" {
-		repo = i.Spec.Valkey.Image.Repository
+	// User-specified image takes precedence
+	if i.Spec.Valkey.Image.Image != "" {
+		return i.Spec.Valkey.Image.Image
 	}
-	if i.Spec.Valkey.Image.Tag != "" {
-		tag = i.Spec.Valkey.Image.Tag
-	}
-	return repo + ":" + tag
-}
 
-// GetImagePullPolicy returns the image pull policy to use
-func (i *Immich) GetImagePullPolicy() corev1.PullPolicy {
-	if i.Spec.Image.PullPolicy != "" {
-		return i.Spec.Image.PullPolicy
-	}
-	return corev1.PullIfNotPresent
+	// Fall back to environment variable (disconnected/air-gapped support)
+	return os.Getenv(EnvRelatedImageValkey)
 }

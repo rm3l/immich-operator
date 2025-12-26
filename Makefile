@@ -160,7 +160,15 @@ build: manifests generate fmt vet ## Build manager binary.
 	go build -o bin/manager cmd/main.go
 
 .PHONY: run
+# Default images for local development (can be overridden: make run RELATED_IMAGE_immich=my-image:tag)
+RELATED_IMAGE_immich ?= ghcr.io/immich-app/immich-server:v1.125.7
+RELATED_IMAGE_machineLearning ?= ghcr.io/immich-app/immich-machine-learning:v1.125.7
+RELATED_IMAGE_valkey ?= docker.io/valkey/valkey:8-alpine
+
 run: manifests generate fmt vet ## Run a controller from your host.
+	RELATED_IMAGE_immich=$(RELATED_IMAGE_immich) \
+	RELATED_IMAGE_machineLearning=$(RELATED_IMAGE_machineLearning) \
+	RELATED_IMAGE_valkey=$(RELATED_IMAGE_valkey) \
 	go run ./cmd/main.go
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.

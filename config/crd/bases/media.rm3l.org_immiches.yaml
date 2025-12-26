@@ -19,10 +19,6 @@ spec:
       jsonPath: .status.ready
       name: Ready
       type: boolean
-    - description: Immich version
-      jsonPath: .status.version
-      name: Version
-      type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
@@ -51,38 +47,26 @@ spec:
           spec:
             description: ImmichSpec defines the desired state of Immich.
             properties:
-              image:
-                description: Image configuration shared across components
-                properties:
-                  pullPolicy:
-                    default: IfNotPresent
-                    description: Image pull policy
-                    type: string
-                  pullSecrets:
-                    description: Image pull secrets
-                    items:
+              imagePullSecrets:
+                description: ImagePullSecrets are the secrets used to pull images
+                  from private registries
+                items:
+                  description: |-
+                    LocalObjectReference contains enough information to let you locate the
+                    referenced object inside the same namespace.
+                  properties:
+                    name:
+                      default: ""
                       description: |-
-                        LocalObjectReference contains enough information to let you locate the
-                        referenced object inside the same namespace.
-                      properties:
-                        name:
-                          default: ""
-                          description: |-
-                            Name of the referent.
-                            This field is effectively required, but due to backwards compatibility is
-                            allowed to be empty. Instances of this type with an empty value here are
-                            almost certainly wrong.
-                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                          type: string
-                      type: object
-                      x-kubernetes-map-type: atomic
-                    type: array
-                  tag:
-                    default: v1.125.7
-                    description: Image tag to use for all Immich components (unless
-                      overridden)
-                    type: string
-                type: object
+                        Name of the referent.
+                        This field is effectively required, but due to backwards compatibility is
+                        allowed to be empty. Instances of this type with an empty value here are
+                        almost certainly wrong.
+                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      type: string
+                  type: object
+                  x-kubernetes-map-type: atomic
+                type: array
               immich:
                 description: Immich shared configuration
                 properties:
@@ -1527,14 +1511,12 @@ spec:
                   image:
                     description: Image configuration for machine learning
                     properties:
+                      image:
+                        description: Image is the full image reference (e.g., "ghcr.io/immich-app/immich-server:v1.125.7")
+                        type: string
                       pullPolicy:
-                        description: Pull policy (overrides default)
-                        type: string
-                      repository:
-                        description: Repository for the image (overrides default)
-                        type: string
-                      tag:
-                        description: Tag for the image (overrides default)
+                        description: PullPolicy overrides the default pull policy
+                          for this component
                         type: string
                     type: object
                   nodeSelector:
@@ -3254,14 +3236,12 @@ spec:
                   image:
                     description: Image configuration for the server
                     properties:
+                      image:
+                        description: Image is the full image reference (e.g., "ghcr.io/immich-app/immich-server:v1.125.7")
+                        type: string
                       pullPolicy:
-                        description: Pull policy (overrides default)
-                        type: string
-                      repository:
-                        description: Repository for the image (overrides default)
-                        type: string
-                      tag:
-                        description: Tag for the image (overrides default)
+                        description: PullPolicy overrides the default pull policy
+                          for this component
                         type: string
                     type: object
                   ingress:
@@ -4795,14 +4775,12 @@ spec:
                   image:
                     description: Image configuration for Valkey
                     properties:
+                      image:
+                        description: Image is the full image reference (e.g., "ghcr.io/immich-app/immich-server:v1.125.7")
+                        type: string
                       pullPolicy:
-                        description: Pull policy (overrides default)
-                        type: string
-                      repository:
-                        description: Repository for the image (overrides default)
-                        type: string
-                      tag:
-                        description: Tag for the image (overrides default)
+                        description: PullPolicy overrides the default pull policy
+                          for this component
                         type: string
                     type: object
                   nodeSelector:
@@ -5449,9 +5427,6 @@ spec:
               valkeyReady:
                 description: ValkeyReady indicates if the Valkey component is ready
                 type: boolean
-              version:
-                description: Version of Immich currently deployed
-                type: string
             type: object
         type: object
     served: true

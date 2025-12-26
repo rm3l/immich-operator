@@ -130,6 +130,22 @@ func (r *ImmichReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		Message: "Reconciling Immich resources",
 	})
 
+	// Validate required images are set
+	if err := r.validateImages(immich); err != nil {
+		log.Error(err, "Image validation failed")
+		meta.SetStatusCondition(&immich.Status.Conditions, metav1.Condition{
+			Type:    ConditionTypeDegraded,
+			Status:  metav1.ConditionTrue,
+			Reason:  "ImageNotConfigured",
+			Message: err.Error(),
+		})
+		immich.Status.Ready = false
+		if statusErr := r.Status().Update(ctx, immich); statusErr != nil {
+			log.Error(statusErr, "Failed to update status")
+		}
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
+	}
+
 	// Reconcile all components
 	var reconcileErr error
 
@@ -192,7 +208,7 @@ func (r *ImmichReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	immich.Status.ObservedGeneration = immich.Generation
-	immich.Status.Version = immich.GetImageTag()
+	// Extract version from the server image (most representative of the Immich version)
 
 	if err := r.Status().Update(ctx, immich); err != nil {
 		log.Error(err, "Failed to update Immich status")
@@ -337,7 +353,7 @@ func (r *ImmichReconciler) reconcileValkeyDeployment(ctx context.Context, immich
 				},
 				Spec: corev1.PodSpec{
 					SecurityContext:  immich.Spec.Valkey.PodSecurityContext,
-					ImagePullSecrets: immich.Spec.Image.PullSecrets,
+					ImagePullSecrets: immich.Spec.ImagePullSecrets,
 					NodeSelector:     immich.Spec.Valkey.NodeSelector,
 					Tolerations:      immich.Spec.Valkey.Tolerations,
 					Affinity:         immich.Spec.Valkey.Affinity,
@@ -345,7 +361,7 @@ func (r *ImmichReconciler) reconcileValkeyDeployment(ctx context.Context, immich
 						{
 							Name:            "valkey",
 							Image:           immich.GetValkeyImage(),
-							ImagePullPolicy: immich.GetImagePullPolicy(),
+							ImagePullPolicy: immich.Spec.Valkey.Image.PullPolicy,
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "redis",
@@ -587,7 +603,7 @@ func (r *ImmichReconciler) reconcileMLDeployment(ctx context.Context, immich *me
 				},
 				Spec: corev1.PodSpec{
 					SecurityContext:  immich.Spec.MachineLearning.PodSecurityContext,
-					ImagePullSecrets: immich.Spec.Image.PullSecrets,
+					ImagePullSecrets: immich.Spec.ImagePullSecrets,
 					NodeSelector:     immich.Spec.MachineLearning.NodeSelector,
 					Tolerations:      immich.Spec.MachineLearning.Tolerations,
 					Affinity:         immich.Spec.MachineLearning.Affinity,
@@ -595,7 +611,7 @@ func (r *ImmichReconciler) reconcileMLDeployment(ctx context.Context, immich *me
 						{
 							Name:            "machine-learning",
 							Image:           immich.GetMachineLearningImage(),
-							ImagePullPolicy: immich.GetImagePullPolicy(),
+							ImagePullPolicy: immich.Spec.MachineLearning.Image.PullPolicy,
 							Env:             env,
 							EnvFrom:         immich.Spec.MachineLearning.EnvFrom,
 							Ports: []corev1.ContainerPort{
@@ -875,7 +891,7 @@ func (r *ImmichReconciler) reconcileServerDeployment(ctx context.Context, immich
 				},
 				Spec: corev1.PodSpec{
 					SecurityContext:  immich.Spec.Server.PodSecurityContext,
-					ImagePullSecrets: immich.Spec.Image.PullSecrets,
+					ImagePullSecrets: immich.Spec.ImagePullSecrets,
 					NodeSelector:     immich.Spec.Server.NodeSelector,
 					Tolerations:      immich.Spec.Server.Tolerations,
 					Affinity:         immich.Spec.Server.Affinity,
@@ -883,7 +899,7 @@ func (r *ImmichReconciler) reconcileServerDeployment(ctx context.Context, immich
 						{
 							Name:            "server",
 							Image:           immich.GetServerImage(),
-							ImagePullPolicy: immich.GetImagePullPolicy(),
+							ImagePullPolicy: immich.Spec.Server.Image.PullPolicy,
 							Env:             env,
 							EnvFrom:         immich.Spec.Server.EnvFrom,
 							Ports:           ports,
@@ -1355,6 +1371,29 @@ func (r *ImmichReconciler) createOrUpdate(ctx context.Context, obj client.Object
 
 	log.Info("Updating resource", "kind", obj.GetObjectKind().GroupVersionKind().Kind, "name", obj.GetName())
 	return r.Update(ctx, obj)
+}
+
+// validateImages checks that all required images are configured
+func (r *ImmichReconciler) validateImages(immich *mediav1alpha1.Immich) error {
+	var missingImages []string
+
+	if immich.IsServerEnabled() && immich.GetServerImage() == "" {
+		missingImages = append(missingImages, fmt.Sprintf("server (set spec.server.image.image or %s env var)", mediav1alpha1.EnvRelatedImageImmich))
+	}
+
+	if immich.IsMachineLearningEnabled() && immich.GetMachineLearningImage() == "" {
+		missingImages = append(missingImages, fmt.Sprintf("machine-learning (set spec.machineLearning.image.image or %s env var)", mediav1alpha1.EnvRelatedImageMachineLearning))
+	}
+
+	if immich.IsValkeyEnabled() && immich.GetValkeyImage() == "" {
+		missingImages = append(missingImages, fmt.Sprintf("valkey (set spec.valkey.image.image or %s env var)", mediav1alpha1.EnvRelatedImageValkey))
+	}
+
+	if len(missingImages) > 0 {
+		return fmt.Errorf("missing required images: %v", missingImages)
+	}
+
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

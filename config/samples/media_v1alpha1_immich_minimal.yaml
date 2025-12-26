@@ -6,6 +6,7 @@ spec:
   # Minimal configuration - requires:
   # 1. A PostgreSQL database
   # 2. A PVC for the photo library
+  # 3. Image references for each enabled component
 
   # PostgreSQL database configuration (required)
   postgres:
@@ -20,11 +21,19 @@ spec:
       library:
         existingClaim: immich-library
 
-  # Use built-in Valkey for Redis
-  valkey:
-    enabled: true
+  # Server component (required image)
+  server:
+    image:
+      image: ghcr.io/immich-app/immich-server:v1.125.7
 
-  # Enable Machine Learning for smart search and face detection
+  # Machine Learning for smart search and face detection (required image)
   machineLearning:
     enabled: true
+    image:
+      image: ghcr.io/immich-app/immich-machine-learning:v1.125.7
 
+  # Built-in Valkey for Redis (required image)
+  valkey:
+    enabled: true
+    image:
+      image: docker.io/valkey/valkey:8-alpine

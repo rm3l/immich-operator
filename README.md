@@ -91,9 +91,6 @@ metadata:
   name: immich
   namespace: immich
 spec:
-  image:
-    tag: v1.125.7
-
   postgres:
     host: postgres.database.svc.cluster.local
     database: immich
@@ -109,6 +106,8 @@ spec:
 
   server:
     enabled: true
+    image:
+      image: ghcr.io/immich-app/immich-server:v1.125.7
     ingress:
       enabled: true
       ingressClassName: nginx
@@ -122,23 +121,82 @@ spec:
 
   machineLearning:
     enabled: true
+    image:
+      image: ghcr.io/immich-app/immich-machine-learning:v1.125.7
     persistence:
       enabled: true
       size: 10Gi
 
   valkey:
     enabled: true
+    image:
+      image: docker.io/valkey/valkey:8-alpine
 ```
 
 ## Configuration Reference
 
-### ImmichSpec
+### Image Configuration
+
+**Images are required** for each enabled component. They can be specified via:
+
+1. **CR spec** (highest priority) - user-specified in the Custom Resource
+2. **Environment variables** (fallback) - `RELATED_IMAGE_*` for disconnected environments
+
+If neither is set for an enabled component, the operator will report an error.
+
+#### Global Image Settings
 
 | Field | Description | Default |
 |-------|-------------|---------|
-| `image.tag` | Immich version tag | `v1.125.7` |
-| `image.pullPolicy` | Image pull policy | `IfNotPresent` |
-| `image.pullSecrets` | Image pull secrets | `[]` |
+| `imagePullSecrets` | Image pull secrets for private registries | `[]` |
+
+#### Per-Component Image Settings
+
+Each component (server, machineLearning, valkey) requires:
+
+| Field | Description |
+|-------|-------------|
+| `<component>.image.image` | **Required.** Full image reference (e.g., `ghcr.io/immich-app/immich-server:v1.125.7`) |
+| `<component>.image.pullPolicy` | Pull policy override for this component |
+
+#### Example: Specifying Images
+
+```yaml
+spec:
+  server:
+    image:
+      image: ghcr.io/immich-app/immich-server:v1.125.7
+  machineLearning:
+    image:
+      image: ghcr.io/immich-app/immich-machine-learning:v1.125.7
+  valkey:
+    image:
+      image: docker.io/valkey/valkey:8-alpine
+```
+
+#### Disconnected/Air-Gapped Environments
+
+For disconnected environments (e.g., OpenShift), the operator supports `RELATED_IMAGE_*` environment variables as a fallback when images are not specified in the CR:
+
+| Environment Variable | Component |
+|---------------------|-----------|
+| `RELATED_IMAGE_immich` | Immich Server |
+| `RELATED_IMAGE_machineLearning` | Machine Learning |
+| `RELATED_IMAGE_valkey` | Valkey (Redis) |
+
+Set these in the operator deployment:
+
+```yaml
+env:
+  - name: RELATED_IMAGE_immich
+    value: my-mirror.example.com/immich/server:v1.125.7
+  - name: RELATED_IMAGE_machineLearning
+    value: my-mirror.example.com/immich/ml:v1.125.7
+  - name: RELATED_IMAGE_valkey
+    value: my-mirror.example.com/valkey:8-alpine
+```
+
+**Note:** If a user specifies an image in the CR, it takes precedence over the environment variable.
 
 ### PostgreSQL Configuration
 
@@ -167,6 +225,7 @@ spec:
 | Field | Description | Default |
 |-------|-------------|---------|
 | `server.enabled` | Enable server component | `true` |
+| `server.image.image` | **Required.** Full image reference | - |
 | `server.replicas` | Number of replicas | `1` |
 | `server.resources` | Resource requirements | `{}` |
 | `server.ingress.enabled` | Enable ingress | `false` |
@@ -179,6 +238,7 @@ spec:
 | Field | Description | Default |
 |-------|-------------|---------|
 | `machineLearning.enabled` | Enable ML component | `true` |
+| `machineLearning.image.image` | **Required.** Full image reference | - |
 | `machineLearning.replicas` | Number of replicas | `1` |
 | `machineLearning.resources` | Resource requirements | `{}` |
 | `machineLearning.persistence.enabled` | Enable cache persistence | `true` |
@@ -189,6 +249,7 @@ spec:
 | Field | Description | Default |
 |-------|-------------|---------|
 | `valkey.enabled` | Enable built-in Valkey | `true` |
+| `valkey.image.image` | **Required.** Full image reference | - |
 | `valkey.resources` | Resource requirements | `{}` |
 | `valkey.persistence.enabled` | Enable data persistence | `false` |
 | `valkey.persistence.size` | Data PVC size | `1Gi` |

@@ -19,7 +19,10 @@ metadata:
               }
             },
             "machineLearning": {
-              "enabled": true
+              "enabled": true,
+              "image": {
+                "image": "ghcr.io/immich-app/immich-machine-learning:v1.125.7"
+              }
             },
             "postgres": {
               "host": "postgres",
@@ -28,8 +31,16 @@ metadata:
                 "name": "immich-postgres"
               }
             },
+            "server": {
+              "image": {
+                "image": "ghcr.io/immich-app/immich-server:v1.125.7"
+              }
+            },
             "valkey": {
-              "enabled": true
+              "enabled": true,
+              "image": {
+                "image": "docker.io/valkey/valkey:8-alpine"
+              }
             }
           }
         },
@@ -44,10 +55,6 @@ metadata:
             "name": "immich-sample"
           },
           "spec": {
-            "image": {
-              "pullPolicy": "IfNotPresent",
-              "tag": "v1.125.7"
-            },
             "immich": {
               "configuration": {
                 "storageTemplate": {
@@ -71,6 +78,9 @@ metadata:
             },
             "machineLearning": {
               "enabled": true,
+              "image": {
+                "image": "ghcr.io/immich-app/immich-machine-learning:v1.125.7"
+              },
               "persistence": {
                 "enabled": true,
                 "size": "10Gi"
@@ -98,6 +108,9 @@ metadata:
             },
             "server": {
               "enabled": true,
+              "image": {
+                "image": "ghcr.io/immich-app/immich-server:v1.125.7"
+              },
               "ingress": {
                 "annotations": {
                   "nginx.ingress.kubernetes.io/proxy-body-size": "0"
@@ -137,6 +150,9 @@ metadata:
             },
             "valkey": {
               "enabled": true,
+              "image": {
+                "image": "docker.io/valkey/valkey:8-alpine"
+              },
               "persistence": {
                 "enabled": false,
                 "size": "1Gi"
@@ -155,7 +171,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-12-26T10:21:42Z"
+    createdAt: "2025-12-26T23:31:27Z"
     operators.operatorframework.io/builder: operator-sdk-v1.42.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: immich-operator.v0.0.1
@@ -297,6 +313,13 @@ spec:
                 - --health-probe-bind-address=:8081
                 command:
                 - /manager
+                env:
+                - name: RELATED_IMAGE_immich
+                  value: ghcr.io/immich-app/immich-server:v1.125.7
+                - name: RELATED_IMAGE_machineLearning
+                  value: ghcr.io/immich-app/immich-machine-learning:v1.125.7
+                - name: RELATED_IMAGE_valkey
+                  value: docker.io/valkey/valkey:8-alpine
                 image: controller:latest
                 livenessProbe:
                   httpGet:
@@ -389,4 +412,11 @@ spec:
   provider:
     name: Armel Soro
     url: https://armel.soro.io
+  relatedImages:
+  - image: ghcr.io/immich-app/immich-server:v1.125.7
+    name: immich
+  - image: ghcr.io/immich-app/immich-machine-learning:v1.125.7
+    name: machinelearning
+  - image: docker.io/valkey/valkey:8-alpine
+    name: valkey
   version: 0.0.1

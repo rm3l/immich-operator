@@ -6,10 +6,9 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: immich-sample
 spec:
-  # Global image configuration
-  image:
-    tag: v1.125.7
-    pullPolicy: IfNotPresent
+  # Image pull secrets for private registries (optional)
+  # imagePullSecrets:
+  #   - name: my-registry-secret
 
   # Immich shared configuration
   immich:
@@ -51,6 +50,9 @@ spec:
   server:
     enabled: true
     replicas: 1
+    # Image is REQUIRED - specify full image reference
+    image:
+      image: ghcr.io/immich-app/immich-server:v1.125.7
     resources:
       requests:
         cpu: 100m
@@ -76,6 +78,9 @@ spec:
   machineLearning:
     enabled: true
     replicas: 1
+    # Image is REQUIRED - specify full image reference
+    image:
+      image: ghcr.io/immich-app/immich-machine-learning:v1.125.7
     resources:
       requests:
         cpu: 100m
@@ -90,6 +95,9 @@ spec:
   # Valkey (Redis) component configuration
   valkey:
     enabled: true
+    # Image is REQUIRED - specify full image reference
+    image:
+      image: docker.io/valkey/valkey:8-alpine
     resources:
       requests:
         cpu: 50m
