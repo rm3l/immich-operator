@@ -56,8 +56,8 @@ spec:
     enabled: true
     replicas: 1
     # Image is optional - defaults to RELATED_IMAGE_immich env var
-    # image:
-    #   image: ghcr.io/immich-app/immich-server:v1.125.7
+    # image: ghcr.io/immich-app/immich-server:v1.125.7
+    # imagePullPolicy: IfNotPresent
     resources:
       requests:
         cpu: 100m
@@ -84,8 +84,8 @@ spec:
     enabled: true
     replicas: 1
     # Image is optional - defaults to RELATED_IMAGE_machineLearning env var
-    # image:
-    #   image: ghcr.io/immich-app/immich-machine-learning:v1.125.7
+    # image: ghcr.io/immich-app/immich-machine-learning:v1.125.7
+    # imagePullPolicy: IfNotPresent
     resources:
       requests:
         cpu: 100m
@@ -101,8 +101,8 @@ spec:
   valkey:
     enabled: true
     # Image is optional - defaults to RELATED_IMAGE_valkey env var
-    # image:
-    #   image: docker.io/valkey/valkey:8-alpine
+    # image: docker.io/valkey/valkey:8-alpine
+    # imagePullPolicy: IfNotPresent
     resources:
       requests:
         cpu: 50m

@@ -14,14 +14,8 @@ metadata:
             "immich": {
               "persistence": {
                 "library": {
-                  "existingClaim": "immich-library"
+                  "size": "100Gi"
                 }
-              }
-            },
-            "machineLearning": {
-              "enabled": true,
-              "image": {
-                "image": "ghcr.io/immich-app/immich-machine-learning:v1.125.7"
               }
             },
             "postgres": {
@@ -29,17 +23,6 @@ metadata:
               "passwordSecretRef": {
                 "key": "password",
                 "name": "immich-postgres"
-              }
-            },
-            "server": {
-              "image": {
-                "image": "ghcr.io/immich-app/immich-server:v1.125.7"
-              }
-            },
-            "valkey": {
-              "enabled": true,
-              "image": {
-                "image": "docker.io/valkey/valkey:8-alpine"
               }
             }
           }
@@ -72,15 +55,12 @@ metadata:
               },
               "persistence": {
                 "library": {
-                  "existingClaim": "immich-library"
+                  "size": "100Gi"
                 }
               }
             },
             "machineLearning": {
               "enabled": true,
-              "image": {
-                "image": "ghcr.io/immich-app/immich-machine-learning:v1.125.7"
-              },
               "persistence": {
                 "enabled": true,
                 "size": "10Gi"
@@ -108,9 +88,6 @@ metadata:
             },
             "server": {
               "enabled": true,
-              "image": {
-                "image": "ghcr.io/immich-app/immich-server:v1.125.7"
-              },
               "ingress": {
                 "annotations": {
                   "nginx.ingress.kubernetes.io/proxy-body-size": "0"
@@ -150,9 +127,6 @@ metadata:
             },
             "valkey": {
               "enabled": true,
-              "image": {
-                "image": "docker.io/valkey/valkey:8-alpine"
-              },
               "persistence": {
                 "enabled": false,
                 "size": "1Gi"
@@ -171,7 +145,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-12-26T23:31:27Z"
+    createdAt: "2025-12-27T00:07:25Z"
     operators.operatorframework.io/builder: operator-sdk-v1.42.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: immich-operator.v0.0.1

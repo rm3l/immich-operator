@@ -1532,16 +1532,14 @@ spec:
                       type: object
                     type: array
                   image:
-                    description: Image configuration for machine learning
-                    properties:
-                      image:
-                        description: Image is the full image reference (e.g., "ghcr.io/immich-app/immich-server:v1.125.7")
-                        type: string
-                      pullPolicy:
-                        description: PullPolicy overrides the default pull policy
-                          for this component
-                        type: string
-                    type: object
+                    description: |-
+                      Image is the full image reference (e.g., "ghcr.io/immich-app/immich-machine-learning:v1.125.7")
+                      If not set, defaults to RELATED_IMAGE_machineLearning environment variable
+                    type: string
+                  imagePullPolicy:
+                    description: ImagePullPolicy overrides the default pull policy
+                      for this component
+                    type: string
                   nodeSelector:
                     additionalProperties:
                       type: string
@@ -3257,16 +3255,14 @@ spec:
                       type: object
                     type: array
                   image:
-                    description: Image configuration for the server
-                    properties:
-                      image:
-                        description: Image is the full image reference (e.g., "ghcr.io/immich-app/immich-server:v1.125.7")
-                        type: string
-                      pullPolicy:
-                        description: PullPolicy overrides the default pull policy
-                          for this component
-                        type: string
-                    type: object
+                    description: |-
+                      Image is the full image reference (e.g., "ghcr.io/immich-app/immich-server:v1.125.7")
+                      If not set, defaults to RELATED_IMAGE_immich environment variable
+                    type: string
+                  imagePullPolicy:
+                    description: ImagePullPolicy overrides the default pull policy
+                      for this component
+                    type: string
                   ingress:
                     description: Ingress configuration
                     properties:
@@ -4796,16 +4792,14 @@ spec:
                       Set to false if using an external Redis/Valkey instance
                     type: boolean
                   image:
-                    description: Image configuration for Valkey
-                    properties:
-                      image:
-                        description: Image is the full image reference (e.g., "ghcr.io/immich-app/immich-server:v1.125.7")
-                        type: string
-                      pullPolicy:
-                        description: PullPolicy overrides the default pull policy
-                          for this component
-                        type: string
-                    type: object
+                    description: |-
+                      Image is the full image reference (e.g., "docker.io/valkey/valkey:8-alpine")
+                      If not set, defaults to RELATED_IMAGE_valkey environment variable
+                    type: string
+                  imagePullPolicy:
+                    description: ImagePullPolicy overrides the default pull policy
+                      for this component
+                    type: string
                   nodeSelector:
                     additionalProperties:
                       type: string

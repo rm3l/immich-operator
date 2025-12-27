@@ -378,9 +378,14 @@ type ServerSpec struct {
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
 
-	// Image configuration for the server
+	// Image is the full image reference (e.g., "ghcr.io/immich-app/immich-server:v1.125.7")
+	// If not set, defaults to RELATED_IMAGE_immich environment variable
 	// +optional
-	Image ComponentImageSpec `json:"image,omitempty"`
+	Image string `json:"image,omitempty"`
+
+	// ImagePullPolicy overrides the default pull policy for this component
+	// +optional
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 
 	// Number of replicas
 	// +kubebuilder:default=1
@@ -439,9 +444,14 @@ type MachineLearningSpec struct {
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
 
-	// Image configuration for machine learning
+	// Image is the full image reference (e.g., "ghcr.io/immich-app/immich-machine-learning:v1.125.7")
+	// If not set, defaults to RELATED_IMAGE_machineLearning environment variable
 	// +optional
-	Image ComponentImageSpec `json:"image,omitempty"`
+	Image string `json:"image,omitempty"`
+
+	// ImagePullPolicy overrides the default pull policy for this component
+	// +optional
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 
 	// Number of replicas
 	// +kubebuilder:default=1
@@ -526,9 +536,14 @@ type ValkeySpec struct {
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
 
-	// Image configuration for Valkey
+	// Image is the full image reference (e.g., "docker.io/valkey/valkey:8-alpine")
+	// If not set, defaults to RELATED_IMAGE_valkey environment variable
 	// +optional
-	Image ComponentImageSpec `json:"image,omitempty"`
+	Image string `json:"image,omitempty"`
+
+	// ImagePullPolicy overrides the default pull policy for this component
+	// +optional
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 
 	// Resource requirements
 	// +optional
@@ -632,17 +647,6 @@ type SecretKeySelector struct {
 	Name string `json:"name"`
 	// Key in the secret
 	Key string `json:"key"`
-}
-
-// ComponentImageSpec defines image configuration for a specific component.
-type ComponentImageSpec struct {
-	// Image is the full image reference (e.g., "ghcr.io/immich-app/immich-server:v1.125.7")
-	// +optional
-	Image string `json:"image,omitempty"`
-
-	// PullPolicy overrides the default pull policy for this component
-	// +optional
-	PullPolicy corev1.PullPolicy `json:"pullPolicy,omitempty"`
 }
 
 // IngressSpec defines ingress configuration.
@@ -786,8 +790,8 @@ func (i *Immich) IsValkeyEnabled() bool {
 // Returns empty string if neither is set (caller should handle as error)
 func (i *Immich) GetServerImage() string {
 	// User-specified image takes precedence
-	if i.Spec.Server.Image.Image != "" {
-		return i.Spec.Server.Image.Image
+	if i.Spec.Server.Image != "" {
+		return i.Spec.Server.Image
 	}
 
 	// Fall back to environment variable (disconnected/air-gapped support)
@@ -801,8 +805,8 @@ func (i *Immich) GetServerImage() string {
 // Returns empty string if neither is set (caller should handle as error)
 func (i *Immich) GetMachineLearningImage() string {
 	// User-specified image takes precedence
-	if i.Spec.MachineLearning.Image.Image != "" {
-		return i.Spec.MachineLearning.Image.Image
+	if i.Spec.MachineLearning.Image != "" {
+		return i.Spec.MachineLearning.Image
 	}
 
 	// Fall back to environment variable (disconnected/air-gapped support)
@@ -816,8 +820,8 @@ func (i *Immich) GetMachineLearningImage() string {
 // Returns empty string if neither is set (caller should handle as error)
 func (i *Immich) GetValkeyImage() string {
 	// User-specified image takes precedence
-	if i.Spec.Valkey.Image.Image != "" {
-		return i.Spec.Valkey.Image.Image
+	if i.Spec.Valkey.Image != "" {
+		return i.Spec.Valkey.Image
 	}
 
 	// Fall back to environment variable (disconnected/air-gapped support)

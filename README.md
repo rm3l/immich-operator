@@ -132,22 +132,20 @@ Each component (server, machineLearning, valkey) supports optional image configu
 
 | Field | Description |
 |-------|-------------|
-| `<component>.image.image` | Full image reference to override the default |
-| `<component>.image.pullPolicy` | Pull policy override for this component |
+| `<component>.image` | Full image reference to override the default |
+| `<component>.imagePullPolicy` | Pull policy override for this component |
 
 #### Example: Overriding Images
 
 ```yaml
 spec:
   server:
-    image:
-      image: my-registry.example.com/immich-server:v1.125.7
+    image: my-registry.example.com/immich-server:v1.125.7
+    imagePullPolicy: Always
   machineLearning:
-    image:
-      image: ghcr.io/immich-app/immich-machine-learning:v1.125.7
+    image: my-registry.example.com/immich-machine-learning:v1.125.7
   valkey:
-    image:
-      image: docker.io/valkey/valkey:8-alpine
+    image: my-registry.example.com/valkey:8-alpine
 ```
 
 #### Disconnected/Air-Gapped Environments
@@ -204,7 +202,8 @@ env:
 | Field | Description | Default |
 |-------|-------------|---------|
 | `server.enabled` | Enable server component | `true` |
-| `server.image.image` | Override default image | `RELATED_IMAGE_immich` |
+| `server.image` | Override default image | `RELATED_IMAGE_immich` |
+| `server.imagePullPolicy` | Pull policy for this component | (K8s default) |
 | `server.replicas` | Number of replicas | `1` |
 | `server.resources` | Resource requirements | `{}` |
 | `server.ingress.enabled` | Enable ingress | `false` |
@@ -217,7 +216,8 @@ env:
 | Field | Description | Default |
 |-------|-------------|---------|
 | `machineLearning.enabled` | Enable ML component | `true` |
-| `machineLearning.image.image` | Override default image | `RELATED_IMAGE_machineLearning` |
+| `machineLearning.image` | Override default image | `RELATED_IMAGE_machineLearning` |
+| `machineLearning.imagePullPolicy` | Pull policy for this component | (K8s default) |
 | `machineLearning.replicas` | Number of replicas | `1` |
 | `machineLearning.resources` | Resource requirements | `{}` |
 | `machineLearning.persistence.enabled` | Enable cache persistence | `true` |
@@ -228,7 +228,8 @@ env:
 | Field | Description | Default |
 |-------|-------------|---------|
 | `valkey.enabled` | Enable built-in Valkey | `true` |
-| `valkey.image.image` | Override default image | `RELATED_IMAGE_valkey` |
+| `valkey.image` | Override default image | `RELATED_IMAGE_valkey` |
+| `valkey.imagePullPolicy` | Pull policy for this component | (K8s default) |
 | `valkey.resources` | Resource requirements | `{}` |
 | `valkey.persistence.enabled` | Enable data persistence | `false` |
 | `valkey.persistence.size` | Data PVC size | `1Gi` |

@@ -421,7 +421,7 @@ func (r *ImmichReconciler) reconcileValkeyDeployment(ctx context.Context, immich
 						{
 							Name:            "valkey",
 							Image:           immich.GetValkeyImage(),
-							ImagePullPolicy: immich.Spec.Valkey.Image.PullPolicy,
+							ImagePullPolicy: immich.Spec.Valkey.ImagePullPolicy,
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "redis",
@@ -671,7 +671,7 @@ func (r *ImmichReconciler) reconcileMLDeployment(ctx context.Context, immich *me
 						{
 							Name:            "machine-learning",
 							Image:           immich.GetMachineLearningImage(),
-							ImagePullPolicy: immich.Spec.MachineLearning.Image.PullPolicy,
+							ImagePullPolicy: immich.Spec.MachineLearning.ImagePullPolicy,
 							Env:             env,
 							EnvFrom:         immich.Spec.MachineLearning.EnvFrom,
 							Ports: []corev1.ContainerPort{
@@ -959,7 +959,7 @@ func (r *ImmichReconciler) reconcileServerDeployment(ctx context.Context, immich
 						{
 							Name:            "server",
 							Image:           immich.GetServerImage(),
-							ImagePullPolicy: immich.Spec.Server.Image.PullPolicy,
+							ImagePullPolicy: immich.Spec.Server.ImagePullPolicy,
 							Env:             env,
 							EnvFrom:         immich.Spec.Server.EnvFrom,
 							Ports:           ports,
