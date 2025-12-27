@@ -145,7 +145,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-12-27T00:07:25Z"
+    createdAt: "2025-12-27T23:03:22Z"
     operators.operatorframework.io/builder: operator-sdk-v1.42.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: immich-operator.v0.0.1
@@ -289,9 +289,9 @@ spec:
                 - /manager
                 env:
                 - name: RELATED_IMAGE_immich
-                  value: ghcr.io/immich-app/immich-server:v1.125.7
+                  value: ghcr.io/immich-app/immich-server:v2.4.1
                 - name: RELATED_IMAGE_machineLearning
-                  value: ghcr.io/immich-app/immich-machine-learning:v1.125.7
+                  value: ghcr.io/immich-app/immich-machine-learning:v2.4.1
                 - name: RELATED_IMAGE_valkey
                   value: docker.io/valkey/valkey:8-alpine
                 image: controller:latest
@@ -387,9 +387,9 @@ spec:
     name: Armel Soro
     url: https://armel.soro.io
   relatedImages:
-  - image: ghcr.io/immich-app/immich-server:v1.125.7
+  - image: ghcr.io/immich-app/immich-server:v2.4.1
     name: immich
-  - image: ghcr.io/immich-app/immich-machine-learning:v1.125.7
+  - image: ghcr.io/immich-app/immich-machine-learning:v2.4.1
     name: machinelearning
   - image: docker.io/valkey/valkey:8-alpine
     name: valkey

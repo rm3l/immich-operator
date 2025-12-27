@@ -161,8 +161,8 @@ build: manifests generate fmt vet ## Build manager binary.
 
 .PHONY: run
 # Default images for local development (can be overridden: make run RELATED_IMAGE_immich=my-image:tag)
-RELATED_IMAGE_immich ?= ghcr.io/immich-app/immich-server:v1.125.7
-RELATED_IMAGE_machineLearning ?= ghcr.io/immich-app/immich-machine-learning:v1.125.7
+RELATED_IMAGE_immich ?= ghcr.io/immich-app/immich-server:v2.4.1
+RELATED_IMAGE_machineLearning ?= ghcr.io/immich-app/immich-machine-learning:v2.4.1
 RELATED_IMAGE_valkey ?= docker.io/valkey/valkey:8-alpine
 
 run: manifests generate fmt vet ## Run a controller from your host.

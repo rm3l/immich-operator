@@ -5788,9 +5788,9 @@ spec:
         - /manager
         env:
         - name: RELATED_IMAGE_immich
-          value: ghcr.io/immich-app/immich-server:v1.125.7
+          value: ghcr.io/immich-app/immich-server:v2.4.1
         - name: RELATED_IMAGE_machineLearning
-          value: ghcr.io/immich-app/immich-machine-learning:v1.125.7
+          value: ghcr.io/immich-app/immich-machine-learning:v2.4.1
         - name: RELATED_IMAGE_valkey
           value: docker.io/valkey/valkey:8-alpine
         image: controller:latest

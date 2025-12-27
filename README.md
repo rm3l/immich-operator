@@ -76,6 +76,7 @@ metadata:
   namespace: immich
 spec:
   postgres:
+    # TODO: leverage OLM dependencies to depend on some PostgreSQL Operator (same for Valkey/Redis)
     host: postgres.database.svc.cluster.local
     database: immich
     username: immich
