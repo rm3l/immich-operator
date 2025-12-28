@@ -40,23 +40,42 @@ spec:
     # Store configuration in ConfigMap (or "Secret" for sensitive data)
     configurationKind: ConfigMap
 
-  # PostgreSQL database configuration
+  # PostgreSQL database configuration (built-in by default)
   postgres:
-    host: postgres.database.svc.cluster.local
-    port: 5432
-    database: immich
-    username: immich
-    # Use a secret reference for the password (recommended)
-    passwordSecretRef:
-      name: immich-postgres
-      key: password
+    # Built-in PostgreSQL is enabled by default
+    enabled: true
+    # Image is optional - defaults to RELATED_IMAGE_postgres env var
+    # image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
+    # Persistence configuration
+    persistence:
+      size: 10Gi
+      # storageClass: standard
+    # Password is auto-generated if not provided
+    # To use your own password, uncomment:
+    # passwordSecretRef:
+    #   name: my-postgres-secret
+    #   key: password
+    # resources:
+    #   requests:
+    #     cpu: 100m
+    #     memory: 256Mi
+
+    # --- To use an external PostgreSQL instead, set enabled: false ---
+    # enabled: false
+    # host: postgres.database.svc.cluster.local
+    # port: 5432
+    # database: immich
+    # username: immich
+    # passwordSecretRef:
+    #   name: external-postgres-secret
+    #   key: password
 
   # Server component configuration
   server:
     enabled: true
     replicas: 1
     # Image is optional - defaults to RELATED_IMAGE_immich env var
-    # image: ghcr.io/immich-app/immich-server:v1.125.7
+    # image: ghcr.io/immich-app/immich-server:v2.4.1
     # imagePullPolicy: IfNotPresent
     resources:
       requests:
@@ -84,7 +103,7 @@ spec:
     enabled: true
     replicas: 1
     # Image is optional - defaults to RELATED_IMAGE_machineLearning env var
-    # image: ghcr.io/immich-app/immich-machine-learning:v1.125.7
+    # image: ghcr.io/immich-app/immich-machine-learning:v2.4.1
     # imagePullPolicy: IfNotPresent
     resources:
       requests:
@@ -97,11 +116,12 @@ spec:
       size: 10Gi
       # storageClass: standard
 
-  # Valkey (Redis) component configuration
+  # Valkey (Redis) component configuration (built-in by default)
   valkey:
+    # Built-in Valkey is enabled by default
     enabled: true
     # Image is optional - defaults to RELATED_IMAGE_valkey env var
-    # image: docker.io/valkey/valkey:8-alpine
+    # image: docker.io/valkey/valkey:9-alpine
     # imagePullPolicy: IfNotPresent
     resources:
       requests:
@@ -112,3 +132,10 @@ spec:
     persistence:
       enabled: false  # Set to true for persistent job queues
       size: 1Gi
+
+    # --- To use an external Redis/Valkey instead, set enabled: false ---
+    # enabled: false
+    # host: redis.external.svc.cluster.local
+    # port: 6379
+    # password: my-redis-password
+    # dbIndex: 0

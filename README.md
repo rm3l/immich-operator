@@ -17,14 +17,14 @@ The operator manages the following Immich components:
 
 - **Server**: The main Immich application server (handles web UI, API, and background jobs)
 - **Machine Learning**: AI/ML service for smart search, face detection, and duplicate detection
-- **Valkey**: Redis-compatible cache for job queues (optional, can use external Redis)
+- **PostgreSQL**: Database with pgvecto.rs extension (built-in by default, can use external)
+- **Valkey**: Redis-compatible cache for job queues (built-in by default, can use external)
 
 ### Prerequisites
 
-External dependencies you need to provide:
+- **Persistent Storage**: A StorageClass for creating PVCs (library, database, ML cache)
 
-- **PostgreSQL Database**: With the `pgvecto.rs` extension installed
-- **Persistent Storage**: A PVC for storing photos and videos
+> **Note**: PostgreSQL and Valkey are deployed by the operator by default. You can disable them and use external instances if preferred.
 
 ## Getting Started
 
@@ -58,15 +58,7 @@ make deploy IMG=<some-registry>/immich-operator:tag
 kubectl create namespace immich
 ```
 
-2. **Create a secret for the PostgreSQL password:**
-
-```sh
-kubectl create secret generic immich-postgres \
-  --namespace immich \
-  --from-literal=password=your-postgres-password
-```
-
-3. **Deploy Immich:**
+2. **Deploy Immich:**
 
 ```yaml
 apiVersion: media.rm3l.org/v1alpha1
@@ -75,20 +67,13 @@ metadata:
   name: immich
   namespace: immich
 spec:
-  postgres:
-    # TODO: leverage OLM dependencies to depend on some PostgreSQL Operator (same for Valkey/Redis)
-    host: postgres.database.svc.cluster.local
-    database: immich
-    username: immich
-    passwordSecretRef:
-      name: immich-postgres
-      key: password
-
+  # Photo library storage (required)
   immich:
     persistence:
       library:
-        size: 100Gi  # Operator creates and manages the PVC
+        size: 100Gi
 
+  # Optional: Configure ingress
   server:
     ingress:
       enabled: true
@@ -100,15 +85,14 @@ spec:
           paths:
             - path: /
               pathType: Prefix
-
-  machineLearning:
-    persistence:
-      enabled: true
-      size: 10Gi
 ```
 
-> **Note:** Images are provided by default via `RELATED_IMAGE_*` environment variables on the operator.
-> You only need to specify images in the CR if you want to override them.
+That's it! The operator will:
+- Deploy PostgreSQL with auto-generated credentials (stored in `<name>-postgres-credentials` secret)
+- Deploy Valkey for job queues
+- Deploy the Immich server and machine learning components
+
+> **Note:** Images are provided via `RELATED_IMAGE_*` environment variables on the operator.
 
 ## Configuration Reference
 
@@ -146,7 +130,7 @@ spec:
   machineLearning:
     image: my-registry.example.com/immich-machine-learning:v1.125.7
   valkey:
-    image: my-registry.example.com/valkey:8-alpine
+    image: my-registry.example.com/valkey:9-alpine
 ```
 
 #### Disconnected/Air-Gapped Environments
@@ -158,22 +142,44 @@ For disconnected environments (e.g., OpenShift), the operator supports `RELATED_
 | `RELATED_IMAGE_immich` | Immich Server |
 | `RELATED_IMAGE_machineLearning` | Machine Learning |
 | `RELATED_IMAGE_valkey` | Valkey (Redis) |
+| `RELATED_IMAGE_postgres` | PostgreSQL |
 
 Set these in the operator deployment:
 
 ```yaml
 env:
   - name: RELATED_IMAGE_immich
-    value: my-mirror.example.com/immich/server:v1.125.7
+    value: my-mirror.example.com/immich/server:v2.4.1
   - name: RELATED_IMAGE_machineLearning
-    value: my-mirror.example.com/immich/ml:v1.125.7
+    value: my-mirror.example.com/immich/ml:v2.4.1
   - name: RELATED_IMAGE_valkey
-    value: my-mirror.example.com/valkey:8-alpine
+    value: my-mirror.example.com/valkey:9-alpine
+  - name: RELATED_IMAGE_postgres
+    value: my-mirror.example.com/immich/postgres:14-vectorchord0.4.3-pgvectors0.2.0
 ```
 
 **Note:** If a user specifies an image in the CR, it takes precedence over the environment variable.
 
 ### PostgreSQL Configuration
+
+The operator deploys PostgreSQL by default with auto-generated credentials. Set `postgres.enabled: false` to use an external database.
+
+When using built-in PostgreSQL, credentials are automatically generated and stored in a secret named `<immich-name>-postgres-credentials`.
+
+| Field | Description | Default |
+|-------|-------------|---------|
+| `postgres.enabled` | Deploy built-in PostgreSQL | `true` |
+| `postgres.image` | Override default image | `RELATED_IMAGE_postgres` |
+| `postgres.imagePullPolicy` | Pull policy for this component | (K8s default) |
+| `postgres.resources` | Resource requirements | `{}` |
+| `postgres.persistence.size` | Data PVC size | `10Gi` |
+| `postgres.persistence.storageClass` | Storage class | (default) |
+| `postgres.persistence.existingClaim` | Use existing PVC | - |
+| `postgres.password` | Database password (plain text) | (auto-generated) |
+| `postgres.passwordSecretRef.name` | Secret name containing password | (auto-generated) |
+| `postgres.passwordSecretRef.key` | Key in the secret | - |
+
+**External PostgreSQL** (when `postgres.enabled: false`):
 
 | Field | Description | Default |
 |-------|-------------|---------|
@@ -181,9 +187,6 @@ env:
 | `postgres.port` | PostgreSQL port | `5432` |
 | `postgres.database` | Database name | `immich` |
 | `postgres.username` | Database username | `immich` |
-| `postgres.password` | Database password (plain text) | - |
-| `postgres.passwordSecretRef.name` | Secret name containing password | - |
-| `postgres.passwordSecretRef.key` | Key in the secret | - |
 | `postgres.urlSecretRef.name` | Secret containing full DATABASE_URL | - |
 
 ### Immich Configuration
@@ -226,14 +229,26 @@ env:
 
 ### Valkey (Redis) Configuration
 
+The operator deploys Valkey by default. Set `valkey.enabled: false` to use an external Redis.
+
 | Field | Description | Default |
 |-------|-------------|---------|
-| `valkey.enabled` | Enable built-in Valkey | `true` |
+| `valkey.enabled` | Deploy built-in Valkey | `true` |
 | `valkey.image` | Override default image | `RELATED_IMAGE_valkey` |
 | `valkey.imagePullPolicy` | Pull policy for this component | (K8s default) |
 | `valkey.resources` | Resource requirements | `{}` |
 | `valkey.persistence.enabled` | Enable data persistence | `false` |
 | `valkey.persistence.size` | Data PVC size | `1Gi` |
+
+**External Redis/Valkey** (when `valkey.enabled: false`):
+
+| Field | Description | Default |
+|-------|-------------|---------|
+| `valkey.host` | Redis hostname | Required |
+| `valkey.port` | Redis port | `6379` |
+| `valkey.password` | Redis password (plain text) | - |
+| `valkey.passwordSecretRef` | Secret containing password | - |
+| `valkey.dbIndex` | Redis database index (0-15) | `0` |
 
 ### Immich Application Configuration
 
@@ -298,7 +313,28 @@ spec:
 
 This is useful when you want the PVC to persist beyond the lifecycle of the Immich CR, or when you have specific storage requirements.
 
-## Using External Redis
+## Using External Services
+
+### External PostgreSQL
+
+To use an external PostgreSQL database instead of the built-in one:
+
+```yaml
+spec:
+  postgres:
+    enabled: false
+    host: postgres.external.svc.cluster.local
+    port: 5432
+    database: immich
+    username: immich
+    passwordSecretRef:
+      name: immich-postgres
+      key: password
+```
+
+> **Note:** The external PostgreSQL must have the `pgvecto.rs` extension installed. You can use the [official Immich PostgreSQL image](https://github.com/immich-app/immich/pkgs/container/postgres) or install the extension on your existing database.
+
+### External Redis/Valkey
 
 To use an external Redis/Valkey instance instead of the built-in one:
 
@@ -306,12 +342,10 @@ To use an external Redis/Valkey instance instead of the built-in one:
 spec:
   valkey:
     enabled: false
-  server:
-    env:
-      - name: REDIS_HOSTNAME
-        value: redis.external.svc.cluster.local
-      - name: REDIS_PORT
-        value: "6379"
+    host: redis.external.svc.cluster.local
+    port: 6379
+    password: my-redis-password  # optional
+    dbIndex: 0  # optional
 ```
 
 ## Status
@@ -324,6 +358,7 @@ status:
   serverReady: true
   machineLearningReady: true
   valkeyReady: true
+  postgresReady: true
   conditions:
     - type: Ready
       status: "True"

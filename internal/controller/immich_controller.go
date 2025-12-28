@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"time"
 
@@ -69,6 +70,7 @@ type ImmichReconciler struct {
 // +kubebuilder:rbac:groups=media.rm3l.org,resources=immiches/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=media.rm3l.org,resources=immiches/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
@@ -161,6 +163,14 @@ func (r *ImmichReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if err := r.reconcileImmichConfig(ctx, immich); err != nil {
 		log.Error(err, "Failed to reconcile Immich config")
 		reconcileErr = err
+	}
+
+	// 3. Reconcile PostgreSQL if enabled
+	if immich.IsPostgresEnabled() {
+		if err := r.reconcilePostgres(ctx, immich); err != nil {
+			log.Error(err, "Failed to reconcile PostgreSQL")
+			reconcileErr = err
+		}
 	}
 
 	// 4. Reconcile Valkey if enabled
@@ -352,6 +362,345 @@ func (r *ImmichReconciler) reconcileLibraryPVC(ctx context.Context, immich *medi
 	}
 
 	log.Info("Creating Library PVC", "name", name, "size", immich.Spec.Immich.Persistence.Library.Size.String())
+	return r.Create(ctx, pvc)
+}
+
+// reconcilePostgres creates or updates the PostgreSQL StatefulSet and service
+func (r *ImmichReconciler) reconcilePostgres(ctx context.Context, immich *mediav1alpha1.Immich) error {
+	log := logf.FromContext(ctx)
+	log.Info("Reconciling PostgreSQL")
+
+	// Create PostgreSQL credentials secret (if needed)
+	if err := r.reconcilePostgresCredentials(ctx, immich); err != nil {
+		return err
+	}
+
+	// Create PostgreSQL PVC (if not using existing)
+	if err := r.reconcilePostgresPVC(ctx, immich); err != nil {
+		return err
+	}
+
+	// Create PostgreSQL StatefulSet
+	if err := r.reconcilePostgresStatefulSet(ctx, immich); err != nil {
+		return err
+	}
+
+	// Create PostgreSQL Service
+	if err := r.reconcilePostgresService(ctx, immich); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// reconcilePostgresCredentials creates a secret with PostgreSQL credentials if not provided
+func (r *ImmichReconciler) reconcilePostgresCredentials(ctx context.Context, immich *mediav1alpha1.Immich) error {
+	log := logf.FromContext(ctx)
+
+	// Skip if user provided explicit credentials
+	if immich.Spec.Postgres.PasswordSecretRef != nil || immich.Spec.Postgres.Password != "" {
+		log.Info("Using user-provided PostgreSQL credentials")
+		return nil
+	}
+
+	// Generate credentials secret for built-in PostgreSQL
+	secretName := fmt.Sprintf("%s-postgres-credentials", immich.Name)
+	labels := r.getLabels(immich, "postgres")
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: immich.Namespace,
+			Labels:    labels,
+		},
+	}
+
+	// Check if secret already exists
+	existing := &corev1.Secret{}
+	err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: immich.Namespace}, existing)
+	if err == nil {
+		// Secret exists, don't regenerate
+		log.Info("PostgreSQL credentials secret already exists", "name", secretName)
+		return nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	// Generate random password
+	password, err := generateRandomPassword(32)
+	if err != nil {
+		return fmt.Errorf("failed to generate PostgreSQL password: %w", err)
+	}
+
+	secret.Data = map[string][]byte{
+		"password": []byte(password),
+		"username": []byte(immich.GetPostgresUsername()),
+		"database": []byte(immich.GetPostgresDatabase()),
+	}
+
+	if err := controllerutil.SetControllerReference(immich, secret, r.Scheme); err != nil {
+		return err
+	}
+
+	log.Info("Creating PostgreSQL credentials secret", "name", secretName)
+	return r.Create(ctx, secret)
+}
+
+// getPostgresPasswordSecretRef returns the secret reference for PostgreSQL password
+// Returns generated secret name if no explicit credentials are provided
+func (r *ImmichReconciler) getPostgresPasswordSecretRef(immich *mediav1alpha1.Immich) *mediav1alpha1.SecretKeySelector {
+	if immich.Spec.Postgres.PasswordSecretRef != nil {
+		return immich.Spec.Postgres.PasswordSecretRef
+	}
+	// Use generated credentials secret
+	return &mediav1alpha1.SecretKeySelector{
+		Name: fmt.Sprintf("%s-postgres-credentials", immich.Name),
+		Key:  "password",
+	}
+}
+
+// reconcilePostgresStatefulSet creates or updates the PostgreSQL StatefulSet
+func (r *ImmichReconciler) reconcilePostgresStatefulSet(ctx context.Context, immich *mediav1alpha1.Immich) error {
+	log := logf.FromContext(ctx)
+	name := fmt.Sprintf("%s-postgres", immich.Name)
+	labels := r.getLabels(immich, "postgres")
+
+	image := immich.GetPostgresImage()
+	if image == "" {
+		return fmt.Errorf("PostgreSQL image not configured: set spec.postgres.image or RELATED_IMAGE_postgres environment variable")
+	}
+
+	// Get password from secret (user-provided or generated)
+	var passwordEnvVar corev1.EnvVar
+	if immich.Spec.Postgres.Password != "" {
+		// Use plain text password (not recommended)
+		passwordEnvVar = corev1.EnvVar{
+			Name:  "POSTGRES_PASSWORD",
+			Value: immich.Spec.Postgres.Password,
+		}
+	} else {
+		// Use secret reference (user-provided or auto-generated)
+		secretRef := r.getPostgresPasswordSecretRef(immich)
+		passwordEnvVar = corev1.EnvVar{
+			Name: "POSTGRES_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretRef.Name,
+					},
+					Key: secretRef.Key,
+				},
+			},
+		}
+	}
+
+	env := []corev1.EnvVar{
+		{Name: "POSTGRES_USER", Value: immich.GetPostgresUsername()},
+		{Name: "POSTGRES_DB", Value: immich.GetPostgresDatabase()},
+		{Name: "POSTGRES_INITDB_ARGS", Value: "--data-checksums"},
+		passwordEnvVar,
+	}
+
+	// Build volume mounts
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "data",
+			MountPath: "/var/lib/postgresql/data",
+		},
+	}
+
+	// Build volumes
+	volumes := []corev1.Volume{
+		{
+			Name: "data",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: immich.GetPostgresPVCName(),
+				},
+			},
+		},
+	}
+
+	sts := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: immich.Namespace,
+			Labels:    labels,
+		},
+	}
+
+	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, sts, func() error {
+		if err := controllerutil.SetControllerReference(immich, sts, r.Scheme); err != nil {
+			return err
+		}
+
+		replicas := int32(1)
+		sts.Spec = appsv1.StatefulSetSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+			ServiceName: name,
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:      labels,
+					Annotations: immich.Spec.Postgres.PodAnnotations,
+				},
+				Spec: corev1.PodSpec{
+					ImagePullSecrets: immich.Spec.ImagePullSecrets,
+					SecurityContext:  immich.Spec.Postgres.PodSecurityContext,
+					NodeSelector:     immich.Spec.Postgres.NodeSelector,
+					Tolerations:      immich.Spec.Postgres.Tolerations,
+					Affinity:         immich.Spec.Postgres.Affinity,
+					Volumes:          volumes,
+					Containers: []corev1.Container{
+						{
+							Name:            "postgres",
+							Image:           image,
+							ImagePullPolicy: immich.Spec.Postgres.ImagePullPolicy,
+							Env:             env,
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "postgres",
+									ContainerPort: 5432,
+									Protocol:      corev1.ProtocolTCP,
+								},
+							},
+							VolumeMounts:    volumeMounts,
+							Resources:       immich.Spec.Postgres.Resources,
+							SecurityContext: immich.Spec.Postgres.SecurityContext,
+							ReadinessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									Exec: &corev1.ExecAction{
+										Command: []string{"pg_isready", "-U", immich.GetPostgresUsername(), "-d", immich.GetPostgresDatabase()},
+									},
+								},
+								InitialDelaySeconds: 5,
+								PeriodSeconds:       10,
+							},
+							LivenessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									Exec: &corev1.ExecAction{
+										Command: []string{"pg_isready", "-U", immich.GetPostgresUsername(), "-d", immich.GetPostgresDatabase()},
+									},
+								},
+								InitialDelaySeconds: 30,
+								PeriodSeconds:       10,
+							},
+						},
+					},
+				},
+			},
+		}
+		return nil
+	})
+
+	if err != nil {
+		log.Error(err, "Failed to create/update PostgreSQL StatefulSet")
+		return err
+	}
+
+	return nil
+}
+
+// reconcilePostgresService creates or updates the PostgreSQL Service
+func (r *ImmichReconciler) reconcilePostgresService(ctx context.Context, immich *mediav1alpha1.Immich) error {
+	log := logf.FromContext(ctx)
+	name := fmt.Sprintf("%s-postgres", immich.Name)
+	labels := r.getLabels(immich, "postgres")
+
+	svc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: immich.Namespace,
+			Labels:    labels,
+		},
+	}
+
+	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, svc, func() error {
+		if err := controllerutil.SetControllerReference(immich, svc, r.Scheme); err != nil {
+			return err
+		}
+
+		svc.Spec = corev1.ServiceSpec{
+			Selector: labels,
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "postgres",
+					Port:       5432,
+					TargetPort: intstr.FromString("postgres"),
+					Protocol:   corev1.ProtocolTCP,
+				},
+			},
+		}
+		return nil
+	})
+
+	if err != nil {
+		log.Error(err, "Failed to create/update PostgreSQL Service")
+		return err
+	}
+
+	return nil
+}
+
+// reconcilePostgresPVC creates the PVC for PostgreSQL data if needed
+func (r *ImmichReconciler) reconcilePostgresPVC(ctx context.Context, immich *mediav1alpha1.Immich) error {
+	log := logf.FromContext(ctx)
+
+	if immich.Spec.Postgres.Persistence.ExistingClaim != "" {
+		return nil // Using existing PVC
+	}
+
+	name := immich.GetPostgresPVCName()
+	labels := r.getLabels(immich, "postgres")
+
+	size := immich.Spec.Postgres.Persistence.Size
+	if size.IsZero() {
+		size = resource.MustParse("10Gi")
+	}
+
+	accessModes := immich.Spec.Postgres.Persistence.AccessModes
+	if len(accessModes) == 0 {
+		accessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
+	}
+
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: immich.Namespace,
+			Labels:    labels,
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(immich, pvc, r.Scheme); err != nil {
+		return err
+	}
+
+	// Check if PVC already exists - we can't update it
+	existing := &corev1.PersistentVolumeClaim{}
+	err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: immich.Namespace}, existing)
+	if err == nil {
+		// PVC exists, don't update
+		return nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	// Create new PVC
+	pvc.Spec = corev1.PersistentVolumeClaimSpec{
+		AccessModes:      accessModes,
+		StorageClassName: immich.Spec.Postgres.Persistence.StorageClass,
+		Resources: corev1.VolumeResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceStorage: size,
+			},
+		},
+	}
+
+	log.Info("Creating PostgreSQL PVC", "name", name, "size", size.String())
 	return r.Create(ctx, pvc)
 }
 
@@ -597,6 +946,14 @@ func (r *ImmichReconciler) reconcileMachineLearning(ctx context.Context, immich 
 	log := logf.FromContext(ctx)
 	log.Info("Reconciling Machine Learning")
 
+	// Create ML PVC first if persistence is enabled (must exist before deployment)
+	persistenceEnabled := immich.Spec.MachineLearning.Persistence.Enabled
+	if persistenceEnabled == nil || *persistenceEnabled {
+		if err := r.reconcileMLPVC(ctx, immich); err != nil {
+			return err
+		}
+	}
+
 	// Create ML Deployment
 	if err := r.reconcileMLDeployment(ctx, immich); err != nil {
 		return err
@@ -605,14 +962,6 @@ func (r *ImmichReconciler) reconcileMachineLearning(ctx context.Context, immich 
 	// Create ML Service
 	if err := r.reconcileMLService(ctx, immich); err != nil {
 		return err
-	}
-
-	// Create ML PVC if persistence is enabled
-	persistenceEnabled := immich.Spec.MachineLearning.Persistence.Enabled
-	if persistenceEnabled == nil || *persistenceEnabled {
-		if err := r.reconcileMLPVC(ctx, immich); err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -818,7 +1167,7 @@ func (r *ImmichReconciler) reconcileMLPVC(ctx context.Context, immich *mediav1al
 
 	accessModes := immich.Spec.MachineLearning.Persistence.AccessModes
 	if len(accessModes) == 0 {
-		accessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany}
+		accessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
 	}
 
 	pvc := &corev1.PersistentVolumeClaim{
@@ -1015,12 +1364,44 @@ func (r *ImmichReconciler) reconcileServerDeployment(ctx context.Context, immich
 func (r *ImmichReconciler) getServerEnv(immich *mediav1alpha1.Immich) []corev1.EnvVar {
 	env := []corev1.EnvVar{}
 
-	// Redis/Valkey hostname
-	if immich.IsValkeyEnabled() {
+	// Redis/Valkey connection - uses helper to determine built-in vs external
+	valkeyHost := immich.GetValkeyHost()
+	if valkeyHost != "" {
 		env = append(env, corev1.EnvVar{
 			Name:  "REDIS_HOSTNAME",
-			Value: fmt.Sprintf("%s-valkey", immich.Name),
+			Value: valkeyHost,
 		})
+		env = append(env, corev1.EnvVar{
+			Name:  "REDIS_PORT",
+			Value: fmt.Sprintf("%d", immich.GetValkeyPort()),
+		})
+		// Add password if configured (external Valkey)
+		if !immich.IsValkeyEnabled() {
+			if immich.Spec.Valkey.PasswordSecretRef != nil {
+				env = append(env, corev1.EnvVar{
+					Name: "REDIS_PASSWORD",
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: immich.Spec.Valkey.PasswordSecretRef.Name,
+							},
+							Key: immich.Spec.Valkey.PasswordSecretRef.Key,
+						},
+					},
+				})
+			} else if immich.Spec.Valkey.Password != "" {
+				env = append(env, corev1.EnvVar{
+					Name:  "REDIS_PASSWORD",
+					Value: immich.Spec.Valkey.Password,
+				})
+			}
+			if immich.Spec.Valkey.DbIndex != 0 {
+				env = append(env, corev1.EnvVar{
+					Name:  "REDIS_DBINDEX",
+					Value: fmt.Sprintf("%d", immich.Spec.Valkey.DbIndex),
+				})
+			}
+		}
 	}
 
 	// Machine Learning URL
@@ -1047,7 +1428,7 @@ func (r *ImmichReconciler) getServerEnv(immich *mediav1alpha1.Immich) []corev1.E
 		})
 	}
 
-	// Database configuration
+	// Database configuration - uses helper methods to determine built-in vs external
 	if immich.Spec.Postgres.URLSecretRef != nil {
 		env = append(env, corev1.EnvVar{
 			Name: "DB_URL",
@@ -1061,55 +1442,43 @@ func (r *ImmichReconciler) getServerEnv(immich *mediav1alpha1.Immich) []corev1.E
 			},
 		})
 	} else {
-		if immich.Spec.Postgres.Host != "" {
-			env = append(env, corev1.EnvVar{
-				Name:  "DB_HOSTNAME",
-				Value: immich.Spec.Postgres.Host,
-			})
-		}
-		port := immich.Spec.Postgres.Port
-		if port == 0 {
-			port = 5432
-		}
+		// Use helper methods which handle built-in vs external automatically
+		env = append(env, corev1.EnvVar{
+			Name:  "DB_HOSTNAME",
+			Value: immich.GetPostgresHost(),
+		})
 		env = append(env, corev1.EnvVar{
 			Name:  "DB_PORT",
-			Value: fmt.Sprintf("%d", port),
+			Value: fmt.Sprintf("%d", immich.GetPostgresPort()),
 		})
-
-		database := immich.Spec.Postgres.Database
-		if database == "" {
-			database = "immich"
-		}
 		env = append(env, corev1.EnvVar{
 			Name:  "DB_DATABASE_NAME",
-			Value: database,
+			Value: immich.GetPostgresDatabase(),
 		})
-
-		username := immich.Spec.Postgres.Username
-		if username == "" {
-			username = "immich"
-		}
 		env = append(env, corev1.EnvVar{
 			Name:  "DB_USERNAME",
-			Value: username,
+			Value: immich.GetPostgresUsername(),
 		})
 
-		if immich.Spec.Postgres.PasswordSecretRef != nil {
+		if immich.Spec.Postgres.Password != "" {
+			// Use plain text password (not recommended)
+			env = append(env, corev1.EnvVar{
+				Name:  "DB_PASSWORD",
+				Value: immich.Spec.Postgres.Password,
+			})
+		} else {
+			// Use secret reference (user-provided or auto-generated for built-in PostgreSQL)
+			secretRef := r.getPostgresPasswordSecretRef(immich)
 			env = append(env, corev1.EnvVar{
 				Name: "DB_PASSWORD",
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
 						LocalObjectReference: corev1.LocalObjectReference{
-							Name: immich.Spec.Postgres.PasswordSecretRef.Name,
+							Name: secretRef.Name,
 						},
-						Key: immich.Spec.Postgres.PasswordSecretRef.Key,
+						Key: secretRef.Key,
 					},
 				},
-			})
-		} else if immich.Spec.Postgres.Password != "" {
-			env = append(env, corev1.EnvVar{
-				Name:  "DB_PASSWORD",
-				Value: immich.Spec.Postgres.Password,
 			})
 		}
 	}
@@ -1124,7 +1493,7 @@ func (r *ImmichReconciler) getServerVolumeMounts(immich *mediav1alpha1.Immich) [
 	if immich.Spec.Immich.Persistence.Library.ExistingClaim != "" || immich.ShouldCreateLibraryPVC() {
 		mounts = append(mounts, corev1.VolumeMount{
 			Name:      "library",
-			MountPath: "/usr/src/app/upload",
+			MountPath: "/data",
 		})
 	}
 
@@ -1357,10 +1726,28 @@ func (r *ImmichReconciler) updateStatus(ctx context.Context, immich *mediav1alph
 		immich.Status.ValkeyReady = true
 	}
 
+	// Check PostgreSQL status
+	if immich.IsPostgresEnabled() {
+		sts := &appsv1.StatefulSet{}
+		name := fmt.Sprintf("%s-postgres", immich.Name)
+		if err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: immich.Namespace}, sts); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return err
+			}
+			immich.Status.PostgresReady = false
+		} else {
+			immich.Status.PostgresReady = sts.Status.ReadyReplicas > 0 &&
+				sts.Status.ReadyReplicas == sts.Status.Replicas
+		}
+	} else {
+		immich.Status.PostgresReady = true
+	}
+
 	// Overall ready status
 	immich.Status.Ready = immich.Status.ServerReady &&
 		immich.Status.MachineLearningReady &&
-		immich.Status.ValkeyReady
+		immich.Status.ValkeyReady &&
+		immich.Status.PostgresReady
 
 	return nil
 }
@@ -1436,24 +1823,64 @@ func (r *ImmichReconciler) createOrUpdate(ctx context.Context, obj client.Object
 // validateImages checks that all required images are configured
 func (r *ImmichReconciler) validateImages(immich *mediav1alpha1.Immich) error {
 	var missingImages []string
+	var configErrors []string
 
 	if immich.IsServerEnabled() && immich.GetServerImage() == "" {
-		missingImages = append(missingImages, fmt.Sprintf("server (set spec.server.image.image or %s env var)", mediav1alpha1.EnvRelatedImageImmich))
+		missingImages = append(missingImages, fmt.Sprintf("server (set spec.server.image or %s env var)", mediav1alpha1.EnvRelatedImageImmich))
 	}
 
 	if immich.IsMachineLearningEnabled() && immich.GetMachineLearningImage() == "" {
-		missingImages = append(missingImages, fmt.Sprintf("machine-learning (set spec.machineLearning.image.image or %s env var)", mediav1alpha1.EnvRelatedImageMachineLearning))
+		missingImages = append(missingImages, fmt.Sprintf("machine-learning (set spec.machineLearning.image or %s env var)", mediav1alpha1.EnvRelatedImageMachineLearning))
 	}
 
 	if immich.IsValkeyEnabled() && immich.GetValkeyImage() == "" {
-		missingImages = append(missingImages, fmt.Sprintf("valkey (set spec.valkey.image.image or %s env var)", mediav1alpha1.EnvRelatedImageValkey))
+		missingImages = append(missingImages, fmt.Sprintf("valkey (set spec.valkey.image or %s env var)", mediav1alpha1.EnvRelatedImageValkey))
+	}
+
+	if immich.IsPostgresEnabled() && immich.GetPostgresImage() == "" {
+		missingImages = append(missingImages, fmt.Sprintf("postgres (set spec.postgres.image or %s env var)", mediav1alpha1.EnvRelatedImagePostgres))
+	}
+
+	// Validate external PostgreSQL config when built-in is disabled
+	if !immich.IsPostgresEnabled() {
+		if immich.Spec.Postgres.Host == "" {
+			configErrors = append(configErrors, "spec.postgres.host is required when spec.postgres.enabled=false")
+		}
+		if immich.Spec.Postgres.Password == "" && immich.Spec.Postgres.PasswordSecretRef == nil && immich.Spec.Postgres.URLSecretRef == nil {
+			configErrors = append(configErrors, "spec.postgres.password or spec.postgres.passwordSecretRef is required when spec.postgres.enabled=false")
+		}
+	}
+	// Note: When postgres.enabled=true and no password is provided, the operator auto-generates credentials
+
+	// Validate external Valkey config when built-in is disabled
+	if !immich.IsValkeyEnabled() {
+		if immich.Spec.Valkey.Host == "" {
+			configErrors = append(configErrors, "spec.valkey.host is required when spec.valkey.enabled=false")
+		}
 	}
 
 	if len(missingImages) > 0 {
 		return fmt.Errorf("missing required images: %v", missingImages)
 	}
 
+	if len(configErrors) > 0 {
+		return fmt.Errorf("configuration errors: %v", configErrors)
+	}
+
 	return nil
+}
+
+// generateRandomPassword generates a cryptographically secure random password
+func generateRandomPassword(length int) (string, error) {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, length)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	for i := range b {
+		b[i] = charset[int(b[i])%len(charset)]
+	}
+	return string(b), nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -1461,6 +1888,7 @@ func (r *ImmichReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&mediav1alpha1.Immich{}).
 		Owns(&appsv1.Deployment{}).
+		Owns(&appsv1.StatefulSet{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.Secret{}).

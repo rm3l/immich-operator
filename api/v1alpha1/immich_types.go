@@ -30,6 +30,7 @@ const (
 	EnvRelatedImageImmich          = "RELATED_IMAGE_immich"
 	EnvRelatedImageMachineLearning = "RELATED_IMAGE_machineLearning"
 	EnvRelatedImageValkey          = "RELATED_IMAGE_valkey"
+	EnvRelatedImagePostgres        = "RELATED_IMAGE_postgres"
 )
 
 // ImmichSpec defines the desired state of Immich.
@@ -529,6 +530,8 @@ type MachineLearningPersistenceSpec struct {
 }
 
 // ValkeySpec defines the Valkey (Redis) component configuration.
+// When enabled=true (default), the operator deploys a Valkey StatefulSet.
+// When enabled=false, you must provide external Redis connection details.
 type ValkeySpec struct {
 	// Enable the built-in Valkey component
 	// Set to false if using an external Redis/Valkey instance
@@ -536,7 +539,7 @@ type ValkeySpec struct {
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
 
-	// Image is the full image reference (e.g., "docker.io/valkey/valkey:8-alpine")
+	// Image is the full image reference (e.g., "docker.io/valkey/valkey:9-alpine")
 	// If not set, defaults to RELATED_IMAGE_valkey environment variable
 	// +optional
 	Image string `json:"image,omitempty"`
@@ -580,6 +583,50 @@ type ValkeySpec struct {
 	// SecurityContext for the container
 	// +optional
 	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
+
+	// --- External Redis/Valkey configuration (used when enabled=false) ---
+
+	// Hostname of the external Redis/Valkey server (required when enabled=false)
+	// +optional
+	Host string `json:"host,omitempty"`
+
+	// Port of the external Redis/Valkey server
+	// +kubebuilder:default=6379
+	// +optional
+	Port int32 `json:"port,omitempty"`
+
+	// Database index to use (0-15)
+	// +kubebuilder:default=0
+	// +optional
+	DbIndex int32 `json:"dbIndex,omitempty"`
+
+	// Password for Redis authentication
+	// +optional
+	Password string `json:"password,omitempty"`
+
+	// Reference to a secret containing the Redis password
+	// +optional
+	PasswordSecretRef *SecretKeySelector `json:"passwordSecretRef,omitempty"`
+}
+
+// PostgresPersistenceSpec defines PostgreSQL persistence.
+type PostgresPersistenceSpec struct {
+	// Size of the data PVC
+	// +kubebuilder:default="10Gi"
+	// +optional
+	Size resource.Quantity `json:"size,omitempty"`
+
+	// StorageClass for the data PVC
+	// +optional
+	StorageClass *string `json:"storageClass,omitempty"`
+
+	// Access modes for the data PVC
+	// +optional
+	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
+
+	// Use an existing PVC instead of creating one
+	// +optional
+	ExistingClaim string `json:"existingClaim,omitempty"`
 }
 
 // ValkeyPersistenceSpec defines Valkey persistence.
@@ -608,8 +655,64 @@ type ValkeyPersistenceSpec struct {
 }
 
 // PostgresSpec defines PostgreSQL database configuration.
+// When enabled=true (default), the operator deploys a PostgreSQL StatefulSet.
+// When enabled=false, you must provide external database connection details.
 type PostgresSpec struct {
-	// Hostname of the PostgreSQL server
+	// Enable the built-in PostgreSQL deployment
+	// Set to false if using an external PostgreSQL instance
+	// +kubebuilder:default=true
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Image is the full image reference for the PostgreSQL container
+	// Must include the pgvecto.rs extension for Immich to work
+	// If not set, defaults to RELATED_IMAGE_postgres environment variable
+	// +optional
+	Image string `json:"image,omitempty"`
+
+	// ImagePullPolicy overrides the default pull policy for this component
+	// +optional
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
+	// Resource requirements for the PostgreSQL container
+	// +optional
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Persistence configuration for PostgreSQL data
+	// +optional
+	Persistence PostgresPersistenceSpec `json:"persistence,omitempty"`
+
+	// Node selector
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Tolerations
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// Affinity rules
+	// +optional
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
+	// Pod annotations
+	// +optional
+	PodAnnotations map[string]string `json:"podAnnotations,omitempty"`
+
+	// Pod labels
+	// +optional
+	PodLabels map[string]string `json:"podLabels,omitempty"`
+
+	// SecurityContext for the pod
+	// +optional
+	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
+
+	// SecurityContext for the container
+	// +optional
+	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
+
+	// --- External PostgreSQL configuration (used when enabled=false) ---
+
+	// Hostname of the external PostgreSQL server (required when enabled=false)
 	Host string `json:"host,omitempty"`
 
 	// Port of the PostgreSQL server
@@ -724,6 +827,10 @@ type ImmichStatus struct {
 	// ValkeyReady indicates if the Valkey component is ready
 	// +optional
 	ValkeyReady bool `json:"valkeyReady,omitempty"`
+
+	// PostgresReady indicates if the PostgreSQL component is ready
+	// +optional
+	PostgresReady bool `json:"postgresReady,omitempty"`
 
 	// ObservedGeneration is the last observed generation
 	// +optional
@@ -851,4 +958,82 @@ func (i *Immich) GetLibraryAccessModes() []corev1.PersistentVolumeAccessMode {
 		return i.Spec.Immich.Persistence.Library.AccessModes
 	}
 	return []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
+}
+
+// IsPostgresEnabled returns true if the built-in PostgreSQL is enabled
+func (i *Immich) IsPostgresEnabled() bool {
+	if i.Spec.Postgres.Enabled == nil {
+		return true // default to enabled
+	}
+	return *i.Spec.Postgres.Enabled
+}
+
+// GetPostgresImage returns the full PostgreSQL image reference
+// Priority order:
+// 1. spec.postgres.image (user-specified in CR takes precedence)
+// 2. RELATED_IMAGE_postgres environment variable (for disconnected environments)
+// Returns empty string if neither is set (caller should handle as error)
+func (i *Immich) GetPostgresImage() string {
+	if i.Spec.Postgres.Image != "" {
+		return i.Spec.Postgres.Image
+	}
+	return os.Getenv(EnvRelatedImagePostgres)
+}
+
+// GetPostgresPVCName returns the name of the PVC for PostgreSQL data.
+func (i *Immich) GetPostgresPVCName() string {
+	if i.Spec.Postgres.Persistence.ExistingClaim != "" {
+		return i.Spec.Postgres.Persistence.ExistingClaim
+	}
+	return i.Name + "-postgres-data"
+}
+
+// GetPostgresHost returns the hostname to connect to PostgreSQL.
+// If built-in is enabled, returns the service name. Otherwise returns the external host.
+func (i *Immich) GetPostgresHost() string {
+	if i.IsPostgresEnabled() {
+		return i.Name + "-postgres"
+	}
+	return i.Spec.Postgres.Host
+}
+
+// GetPostgresPort returns the port for PostgreSQL connection.
+func (i *Immich) GetPostgresPort() int32 {
+	if i.Spec.Postgres.Port == 0 {
+		return 5432
+	}
+	return i.Spec.Postgres.Port
+}
+
+// GetPostgresDatabase returns the database name.
+func (i *Immich) GetPostgresDatabase() string {
+	if i.Spec.Postgres.Database == "" {
+		return "immich"
+	}
+	return i.Spec.Postgres.Database
+}
+
+// GetPostgresUsername returns the username for PostgreSQL.
+func (i *Immich) GetPostgresUsername() string {
+	if i.Spec.Postgres.Username == "" {
+		return "immich"
+	}
+	return i.Spec.Postgres.Username
+}
+
+// GetValkeyHost returns the hostname to connect to Valkey/Redis.
+// If built-in is enabled, returns the service name. Otherwise returns the external host.
+func (i *Immich) GetValkeyHost() string {
+	if i.IsValkeyEnabled() {
+		return i.Name + "-valkey"
+	}
+	return i.Spec.Valkey.Host
+}
+
+// GetValkeyPort returns the port for Valkey/Redis connection.
+func (i *Immich) GetValkeyPort() int32 {
+	if i.Spec.Valkey.Port == 0 {
+		return 6379
+	}
+	return i.Spec.Valkey.Port
 }

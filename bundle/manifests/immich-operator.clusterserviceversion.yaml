@@ -19,7 +19,6 @@ metadata:
               }
             },
             "postgres": {
-              "host": "postgres",
               "passwordSecretRef": {
                 "key": "password",
                 "name": "immich-postgres"
@@ -77,14 +76,14 @@ metadata:
               }
             },
             "postgres": {
-              "database": "immich",
-              "host": "postgres.database.svc.cluster.local",
+              "enabled": true,
               "passwordSecretRef": {
                 "key": "password",
                 "name": "immich-postgres"
               },
-              "port": 5432,
-              "username": "immich"
+              "persistence": {
+                "size": "10Gi"
+              }
             },
             "server": {
               "enabled": true,
@@ -145,7 +144,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-12-27T23:03:22Z"
+    createdAt: "2025-12-28T22:48:03Z"
     operators.operatorframework.io/builder: operator-sdk-v1.42.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: immich-operator.v0.0.1
@@ -188,6 +187,7 @@ spec:
           - apps
           resources:
           - deployments
+          - statefulsets
           verbs:
           - create
           - delete
@@ -293,7 +293,9 @@ spec:
                 - name: RELATED_IMAGE_machineLearning
                   value: ghcr.io/immich-app/immich-machine-learning:v2.4.1
                 - name: RELATED_IMAGE_valkey
-                  value: docker.io/valkey/valkey:8-alpine
+                  value: docker.io/valkey/valkey:9-alpine
+                - name: RELATED_IMAGE_postgres
+                  value: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
                 image: controller:latest
                 livenessProbe:
                   httpGet:
@@ -391,6 +393,8 @@ spec:
     name: immich
   - image: ghcr.io/immich-app/immich-machine-learning:v2.4.1
     name: machinelearning
-  - image: docker.io/valkey/valkey:8-alpine
+  - image: docker.io/valkey/valkey:9-alpine
     name: valkey
+  - image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
+    name: postgres
   version: 0.0.1

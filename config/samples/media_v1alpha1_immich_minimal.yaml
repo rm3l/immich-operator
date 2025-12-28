@@ -3,28 +3,22 @@ kind: Immich
 metadata:
   name: immich-minimal
 spec:
-  # Minimal configuration - requires:
-  # 1. A PostgreSQL database
-  # 2. Storage for the photo library (either existing PVC or operator-managed)
-  # Images are provided by the operator via RELATED_IMAGE_* env vars
+  # Minimal configuration - the operator provides:
+  # - Built-in PostgreSQL with pgvecto.rs extension (auto-generated credentials)
+  # - Built-in Valkey (Redis) for job queues
+  # - Default images via RELATED_IMAGE_* env vars
+  #
+  # You only need to configure library storage!
 
-  # PostgreSQL database configuration (required)
-  postgres:
-    host: postgres
-    passwordSecretRef:
-      name: immich-postgres
-      key: password
-
-  # Photo library storage - Option 1: Let the operator create a PVC
+  # Photo library storage
   immich:
     persistence:
       library:
         size: 100Gi
-        # storageClass: my-storage-class  # optional, uses default if not set
-        # accessModes: ["ReadWriteOnce"]  # optional, defaults to ReadWriteOnce
 
-  # Photo library storage - Option 2: Use an existing PVC (uncomment to use)
-  # immich:
-  #   persistence:
-  #     library:
-  #       existingClaim: my-existing-pvc
+  # PostgreSQL credentials are auto-generated and stored in a secret
+  # To provide your own password, uncomment:
+  # postgres:
+  #   passwordSecretRef:
+  #     name: my-postgres-secret
+  #     key: password
