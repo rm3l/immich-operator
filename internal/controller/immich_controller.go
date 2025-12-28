@@ -351,17 +351,18 @@ func (r *ImmichReconciler) reconcileLibraryPVC(ctx context.Context, immich *medi
 		storageClassName = &immich.Spec.Immich.Persistence.Library.StorageClass
 	}
 
+	size := immich.GetLibrarySize()
 	pvc.Spec = corev1.PersistentVolumeClaimSpec{
 		AccessModes:      immich.GetLibraryAccessModes(),
 		StorageClassName: storageClassName,
 		Resources: corev1.VolumeResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceStorage: immich.Spec.Immich.Persistence.Library.Size,
+				corev1.ResourceStorage: size,
 			},
 		},
 	}
 
-	log.Info("Creating Library PVC", "name", name, "size", immich.Spec.Immich.Persistence.Library.Size.String())
+	log.Info("Creating Library PVC", "name", name, "size", size.String())
 	return r.Create(ctx, pvc)
 }
 

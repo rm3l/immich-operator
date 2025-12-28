@@ -58,7 +58,24 @@ make deploy IMG=<some-registry>/immich-operator:tag
 kubectl create namespace immich
 ```
 
-2. **Deploy Immich:**
+2. **Deploy Immich (minimal):**
+
+```yaml
+apiVersion: media.rm3l.org/v1alpha1
+kind: Immich
+metadata:
+  name: immich
+  namespace: immich
+# No spec required! Sensible defaults are provided.
+```
+
+That's it! The operator will automatically:
+- Create a 1Gi library PVC (override with `spec.immich.persistence.library.size`)
+- Deploy PostgreSQL with auto-generated credentials (stored in `<name>-postgres-credentials` secret)
+- Deploy Valkey for job queues
+- Deploy the Immich server and machine learning components
+
+**With custom configuration:**
 
 ```yaml
 apiVersion: media.rm3l.org/v1alpha1
@@ -67,7 +84,7 @@ metadata:
   name: immich
   namespace: immich
 spec:
-  # Photo library storage (required)
+  # Customize library storage size
   immich:
     persistence:
       library:
@@ -86,11 +103,6 @@ spec:
             - path: /
               pathType: Prefix
 ```
-
-That's it! The operator will:
-- Deploy PostgreSQL with auto-generated credentials (stored in `<name>-postgres-credentials` secret)
-- Deploy Valkey for job queues
-- Deploy the Immich server and machine learning components
 
 > **Note:** Images are provided via `RELATED_IMAGE_*` environment variables on the operator.
 
@@ -195,7 +207,7 @@ When using built-in PostgreSQL, credentials are automatically generated and stor
 |-------|-------------|---------|
 | `immich.metrics.enabled` | Enable Prometheus metrics | `false` |
 | `immich.persistence.library.existingClaim` | Use an existing PVC for photo storage | - |
-| `immich.persistence.library.size` | Size of PVC to create (if existingClaim not set) | - |
+| `immich.persistence.library.size` | Size of PVC to create (if existingClaim not set) | `1Gi` |
 | `immich.persistence.library.storageClass` | Storage class for managed PVC | (default) |
 | `immich.persistence.library.accessModes` | Access modes for managed PVC | `["ReadWriteOnce"]` |
 | `immich.configuration` | Immich config file (YAML) | `{}` |
@@ -281,11 +293,11 @@ See the [Immich configuration documentation](https://immich.app/docs/install/con
 
 ### Library Persistence
 
-The photo library requires persistent storage. You can configure this in two ways:
+The photo library requires persistent storage. By default, the operator creates a 1Gi PVC for the library.
 
-**Option 1: Operator-managed PVC** (good for quick testig)
+**Option 1: Operator-managed PVC** (default)
 
-Let the operator create and manage the PVC:
+Let the operator create and manage the PVC (defaults to 1Gi if not specified):
 
 ```yaml
 spec:

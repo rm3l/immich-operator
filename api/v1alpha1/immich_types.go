@@ -945,10 +945,18 @@ func (i *Immich) GetLibraryPVCName() string {
 }
 
 // ShouldCreateLibraryPVC returns true if the operator should create a PVC for the library.
-// This is true when existingClaim is not set but size is configured.
+// This is true when existingClaim is not set (a default size will be used if not specified).
 func (i *Immich) ShouldCreateLibraryPVC() bool {
-	return i.Spec.Immich.Persistence.Library.ExistingClaim == "" &&
-		!i.Spec.Immich.Persistence.Library.Size.IsZero()
+	return i.Spec.Immich.Persistence.Library.ExistingClaim == ""
+}
+
+// GetLibrarySize returns the size for the library PVC.
+// Defaults to 1Gi if not specified.
+func (i *Immich) GetLibrarySize() resource.Quantity {
+	if !i.Spec.Immich.Persistence.Library.Size.IsZero() {
+		return i.Spec.Immich.Persistence.Library.Size
+	}
+	return resource.MustParse("1Gi")
 }
 
 // GetLibraryAccessModes returns the access modes for the library PVC.
