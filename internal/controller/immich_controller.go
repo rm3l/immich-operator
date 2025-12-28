@@ -233,7 +233,7 @@ func (r *ImmichReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	log.Info("Successfully reconciled Immich")
+	log.V(1).Info("Successfully reconciled Immich")
 	return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
 }
 
@@ -316,7 +316,7 @@ func (r *ImmichReconciler) reconcileImmichConfig(ctx context.Context, immich *me
 // reconcileLibraryPVC creates the PVC for the photo library if needed
 func (r *ImmichReconciler) reconcileLibraryPVC(ctx context.Context, immich *mediav1alpha1.Immich) error {
 	log := logf.FromContext(ctx)
-	log.Info("Reconciling Library PVC")
+	log.V(1).Info("Reconciling Library PVC")
 
 	name := immich.GetLibraryPVCName()
 	labels := r.getLabels(immich, "library")
@@ -338,7 +338,7 @@ func (r *ImmichReconciler) reconcileLibraryPVC(ctx context.Context, immich *medi
 	err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: immich.Namespace}, existing)
 	if err == nil {
 		// PVC exists, don't update
-		log.Info("Library PVC already exists", "name", name)
+		log.V(1).Info("Library PVC already exists", "name", name)
 		return nil
 	}
 	if !apierrors.IsNotFound(err) {
@@ -369,7 +369,7 @@ func (r *ImmichReconciler) reconcileLibraryPVC(ctx context.Context, immich *medi
 // reconcilePostgres creates or updates the PostgreSQL StatefulSet and service
 func (r *ImmichReconciler) reconcilePostgres(ctx context.Context, immich *mediav1alpha1.Immich) error {
 	log := logf.FromContext(ctx)
-	log.Info("Reconciling PostgreSQL")
+	log.V(1).Info("Reconciling PostgreSQL")
 
 	// Create PostgreSQL credentials secret (if needed)
 	if err := r.reconcilePostgresCredentials(ctx, immich); err != nil {
@@ -400,7 +400,7 @@ func (r *ImmichReconciler) reconcilePostgresCredentials(ctx context.Context, imm
 
 	// Skip if user provided explicit credentials
 	if immich.Spec.Postgres.PasswordSecretRef != nil || immich.Spec.Postgres.Password != "" {
-		log.Info("Using user-provided PostgreSQL credentials")
+		log.V(1).Info("Using user-provided PostgreSQL credentials")
 		return nil
 	}
 
@@ -421,7 +421,7 @@ func (r *ImmichReconciler) reconcilePostgresCredentials(ctx context.Context, imm
 	err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: immich.Namespace}, existing)
 	if err == nil {
 		// Secret exists, don't regenerate
-		log.Info("PostgreSQL credentials secret already exists", "name", secretName)
+		log.V(1).Info("PostgreSQL credentials secret already exists", "name", secretName)
 		return nil
 	}
 	if !apierrors.IsNotFound(err) {
@@ -708,7 +708,7 @@ func (r *ImmichReconciler) reconcilePostgresPVC(ctx context.Context, immich *med
 // reconcileValkey creates or updates the Valkey (Redis) deployment and service
 func (r *ImmichReconciler) reconcileValkey(ctx context.Context, immich *mediav1alpha1.Immich) error {
 	log := logf.FromContext(ctx)
-	log.Info("Reconciling Valkey")
+	log.V(1).Info("Reconciling Valkey")
 
 	// Create Valkey Deployment
 	if err := r.reconcileValkeyDeployment(ctx, immich); err != nil {
@@ -945,7 +945,7 @@ func (r *ImmichReconciler) reconcileValkeyPVC(ctx context.Context, immich *media
 // reconcileMachineLearning creates or updates the Machine Learning deployment and service
 func (r *ImmichReconciler) reconcileMachineLearning(ctx context.Context, immich *mediav1alpha1.Immich) error {
 	log := logf.FromContext(ctx)
-	log.Info("Reconciling Machine Learning")
+	log.V(1).Info("Reconciling Machine Learning")
 
 	// Create ML PVC first if persistence is enabled (must exist before deployment)
 	persistenceEnabled := immich.Spec.MachineLearning.Persistence.Enabled
@@ -1211,7 +1211,7 @@ func (r *ImmichReconciler) reconcileMLPVC(ctx context.Context, immich *mediav1al
 // reconcileServer creates or updates the Immich Server deployment, service, and ingress
 func (r *ImmichReconciler) reconcileServer(ctx context.Context, immich *mediav1alpha1.Immich) error {
 	log := logf.FromContext(ctx)
-	log.Info("Reconciling Server")
+	log.V(1).Info("Reconciling Server")
 
 	// Create Server Deployment
 	if err := r.reconcileServerDeployment(ctx, immich); err != nil {
@@ -1817,7 +1817,7 @@ func (r *ImmichReconciler) createOrUpdate(ctx context.Context, obj client.Object
 		return nil
 	}
 
-	log.Info("Updating resource", "kind", obj.GetObjectKind().GroupVersionKind().Kind, "name", obj.GetName())
+	log.V(1).Info("Updating resource", "kind", obj.GetObjectKind().GroupVersionKind().Kind, "name", obj.GetName())
 	return r.Update(ctx, obj)
 }
 
