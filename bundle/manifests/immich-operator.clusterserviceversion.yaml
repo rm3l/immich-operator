@@ -17,12 +17,6 @@ metadata:
                   "size": "100Gi"
                 }
               }
-            },
-            "postgres": {
-              "passwordSecretRef": {
-                "key": "password",
-                "name": "immich-postgres"
-              }
             }
           }
         },
@@ -77,10 +71,6 @@ metadata:
             },
             "postgres": {
               "enabled": true,
-              "passwordSecretRef": {
-                "key": "password",
-                "name": "immich-postgres"
-              },
               "persistence": {
                 "size": "10Gi"
               }
@@ -144,7 +134,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-12-28T22:48:03Z"
+    createdAt: "2025-12-28T23:21:56Z"
     operators.operatorframework.io/builder: operator-sdk-v1.42.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: immich-operator.v0.0.1
