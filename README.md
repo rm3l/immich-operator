@@ -325,6 +325,44 @@ spec:
 
 This is useful when you want the PVC to persist beyond the lifecycle of the Immich CR, or when you have specific storage requirements.
 
+### Multi-Node Cluster Considerations
+
+By default, all PVCs use `ReadWriteOnce` access mode. Here's what this means for different storage types:
+
+**Network-attached storage** (NFS, Ceph, Longhorn, etc.):
+- Works across nodes since storage is accessible cluster-wide
+- Each component has its own PVC, so `ReadWriteOnce` is sufficient for single-replica deployments
+
+**Local storage** (local-path, hostPath, etc.):
+- PVCs are bound to specific nodes
+- All Immich pods must be scheduled on the same node
+- Consider using node affinity or a different storage class
+
+**High Availability (multiple server replicas)**:
+
+If you want to run multiple replicas of the server component, the library PVC needs `ReadWriteMany`:
+
+```yaml
+spec:
+  immich:
+    persistence:
+      library:
+        size: 100Gi
+        accessModes:
+          - ReadWriteMany
+  server:
+    replicas: 3
+```
+
+> **Note:** `ReadWriteMany` requires a storage class that supports it (e.g., NFS, CephFS, Azure Files).
+
+| Component | PVC | Notes |
+|-----------|-----|-------|
+| Server | Library PVC | Needs `ReadWriteMany` for multiple replicas |
+| Machine Learning | ML Cache PVC | Separate per pod, `ReadWriteOnce` is fine |
+| PostgreSQL | Postgres Data PVC | StatefulSet, `ReadWriteOnce` is fine |
+| Valkey | Valkey Data PVC | StatefulSet, `ReadWriteOnce` is fine |
+
 ## Using External Services
 
 ### External PostgreSQL
