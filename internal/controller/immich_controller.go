@@ -1304,6 +1304,7 @@ func (r *ImmichReconciler) reconcileServerDeployment(ctx context.Context, immich
 					NodeSelector:     immich.Spec.Server.NodeSelector,
 					Tolerations:      immich.Spec.Server.Tolerations,
 					Affinity:         immich.Spec.Server.Affinity,
+					InitContainers:   r.getServerInitContainers(immich),
 					Containers: []corev1.Container{
 						{
 							Name:            "server",
@@ -1484,6 +1485,63 @@ func (r *ImmichReconciler) getServerEnv(immich *mediav1alpha1.Immich) []corev1.E
 	}
 
 	return env
+}
+
+// getServerInitContainers returns init containers that wait for dependencies
+func (r *ImmichReconciler) getServerInitContainers(immich *mediav1alpha1.Immich) []corev1.Container {
+	initContainers := []corev1.Container{}
+
+	// Wait for PostgreSQL
+	postgresHost := fmt.Sprintf("%s-postgres", immich.Name)
+	postgresPort := int32(5432)
+	if !immich.IsPostgresEnabled() && immich.Spec.Postgres.Host != "" {
+		postgresHost = immich.Spec.Postgres.Host
+		if immich.Spec.Postgres.Port != 0 {
+			postgresPort = immich.Spec.Postgres.Port
+		}
+	}
+
+	initContainers = append(initContainers, corev1.Container{
+		Name:  "wait-for-postgres",
+		Image: "busybox:1.36",
+		Command: []string{
+			"sh", "-c",
+			fmt.Sprintf(`echo "Waiting for PostgreSQL at %s:%d..."
+until nc -z -w2 %s %d; do
+  echo "PostgreSQL is unavailable - sleeping"
+  sleep 2
+done
+echo "PostgreSQL is up"`, postgresHost, postgresPort, postgresHost, postgresPort),
+		},
+	})
+
+	// Wait for Valkey/Redis
+	if immich.IsValkeyEnabled() || immich.Spec.Valkey.Host != "" {
+		valkeyHost := fmt.Sprintf("%s-valkey", immich.Name)
+		valkeyPort := int32(6379)
+		if !immich.IsValkeyEnabled() && immich.Spec.Valkey.Host != "" {
+			valkeyHost = immich.Spec.Valkey.Host
+			if immich.Spec.Valkey.Port != 0 {
+				valkeyPort = immich.Spec.Valkey.Port
+			}
+		}
+
+		initContainers = append(initContainers, corev1.Container{
+			Name:  "wait-for-valkey",
+			Image: "busybox:1.36",
+			Command: []string{
+				"sh", "-c",
+				fmt.Sprintf(`echo "Waiting for Valkey at %s:%d..."
+until nc -z -w2 %s %d; do
+  echo "Valkey is unavailable - sleeping"
+  sleep 2
+done
+echo "Valkey is up"`, valkeyHost, valkeyPort, valkeyHost, valkeyPort),
+			},
+		})
+	}
+
+	return initContainers
 }
 
 func (r *ImmichReconciler) getServerVolumeMounts(immich *mediav1alpha1.Immich) []corev1.VolumeMount {
