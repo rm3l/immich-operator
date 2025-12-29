@@ -19,3 +19,9 @@ updates:
   open-pull-requests-limit: 10
   labels:
   - dependencies
+  groups:
+      k8s-dependencies:
+        dependency-type: "production"
+        applies-to: "version-updates"
+        patterns:
+          - "k8s.io/*"
