@@ -114,7 +114,7 @@ jobs:
 
   # Build bundle image on native runners (parallel)
   build-bundle:
-    needs: [prepare, build-operator]
+    needs: prepare
     strategy:
       fail-fast: false
       matrix:
