@@ -1388,7 +1388,9 @@ spec:
                     type: object
                   enabled:
                     default: true
-                    description: Enable the machine learning component
+                    description: |-
+                      Enable the built-in machine learning component
+                      Set to false to disable ML or use an external service
                     type: boolean
                   env:
                     description: Additional environment variables
@@ -2134,6 +2136,12 @@ spec:
                           type: string
                       type: object
                     type: array
+                  url:
+                    description: |-
+                      URL of the external ML service (optional, used when enabled=false)
+                      If not set when enabled=false, Immich runs without ML features
+                      Example: "http://external-ml-service:3003"
+                    type: string
                 type: object
               postgres:
                 description: PostgreSQL database configuration
