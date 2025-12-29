@@ -117,7 +117,10 @@ spec:
       size: 10Gi
       # storageClass: standard
 
-    # --- To use an external ML service instead, set enabled: false ---
+    # --- To disable ML completely (no smart search, face detection, etc.) ---
+    # enabled: false
+
+    # --- To use an external ML service instead ---
     # enabled: false
     # url: http://external-ml-service:3003
 

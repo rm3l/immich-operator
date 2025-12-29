@@ -273,12 +273,8 @@ func (r *ImmichReconciler) validateImages(immich *mediav1alpha1.Immich) error {
 		}
 	}
 
-	// Validate external ML config when built-in is disabled
-	if !immich.IsMachineLearningEnabled() {
-		if immich.Spec.MachineLearning.URL == "" {
-			configErrors = append(configErrors, "spec.machineLearning.url is required when spec.machineLearning.enabled=false")
-		}
-	}
+	// Note: Machine Learning is optional - it can be disabled completely without providing an external URL.
+	// When disabled without an external URL, Immich will run without ML features (smart search, face detection, etc.).
 
 	if len(missingImages) > 0 {
 		return fmt.Errorf("missing required images: %v", missingImages)

@@ -225,7 +225,9 @@ When using built-in PostgreSQL, credentials are automatically generated and stor
 
 ### Machine Learning Configuration
 
-The operator deploys the ML component by default. Set `machineLearning.enabled: false` to use an external ML service.
+The operator deploys the ML component by default. Set `machineLearning.enabled: false` to disable it or use an external ML service.
+
+> **Note:** Machine Learning is optional. When disabled without an external URL, Immich runs without ML features (smart search, face detection, duplicate detection, etc.).
 
 | Field | Description | Default |
 |-------|-------------|---------|
@@ -241,7 +243,7 @@ The operator deploys the ML component by default. Set `machineLearning.enabled: 
 
 | Field | Description | Default |
 |-------|-------------|---------|
-| `machineLearning.url` | URL of external ML service | Required |
+| `machineLearning.url` | URL of external ML service | - |
 
 ### Valkey (Redis) Configuration
 
@@ -406,9 +408,19 @@ spec:
     dbIndex: 0  # optional
 ```
 
-### External Machine Learning Service
+### Disabling or Externalizing Machine Learning
 
-To use an external ML service instead of the built-in one:
+Machine Learning is optional in Immich. You can disable it completely or use an external service.
+
+**Disable ML completely** (no smart search, face detection, etc.):
+
+```yaml
+spec:
+  machineLearning:
+    enabled: false
+```
+
+**Use an external ML service:**
 
 ```yaml
 spec:
@@ -417,7 +429,7 @@ spec:
     url: http://external-ml-service:3003
 ```
 
-This is useful for:
+External ML is useful for:
 
 - Running ML inference on dedicated hardware (e.g., GPU nodes)
 - Sharing a single ML service across multiple Immich instances

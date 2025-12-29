@@ -447,10 +447,11 @@ type ServerSpec struct {
 
 // MachineLearningSpec defines the machine learning component configuration.
 // When enabled=true (default), the operator deploys an ML Deployment.
-// When enabled=false, you must provide an external ML service URL.
+// When enabled=false, ML is disabled unless an external URL is provided.
+// ML is optional - Immich works without it but lacks smart search, face detection, etc.
 type MachineLearningSpec struct {
 	// Enable the built-in machine learning component
-	// Set to false if using an external ML service
+	// Set to false to disable ML or use an external service
 	// +kubebuilder:default=true
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
@@ -515,7 +516,8 @@ type MachineLearningSpec struct {
 
 	// --- External ML service configuration (used when enabled=false) ---
 
-	// URL of the external ML service (required when enabled=false)
+	// URL of the external ML service (optional, used when enabled=false)
+	// If not set when enabled=false, Immich runs without ML features
 	// Example: "http://external-ml-service:3003"
 	// +optional
 	URL string `json:"url,omitempty"`
