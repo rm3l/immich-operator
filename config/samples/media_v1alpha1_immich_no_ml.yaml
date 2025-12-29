@@ -1,0 +1,11 @@
+# Minimal Immich deployment without Machine Learning
+# This configuration disables ML features (smart search, face detection, etc.)
+# but Immich otherwise functions normally for photo/video management.
+apiVersion: media.rm3l.org/v1alpha1
+kind: Immich
+metadata:
+  name: immich-no-ml
+spec:
+  machineLearning:
+    enabled: false
+
