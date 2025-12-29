@@ -204,7 +204,9 @@ func (r *ImmichReconciler) deepMergeMap(dst, src map[string]interface{}) map[str
 	return result
 }
 
-// reconcileLibraryPVC creates the PVC for the photo library if needed
+// reconcileLibraryPVC creates the PVC for the photo library if needed.
+// Note: Library PVCs do NOT have an owner reference to allow data persistence
+// across Immich CR deletions and recreations.
 func (r *ImmichReconciler) reconcileLibraryPVC(ctx context.Context, immich *mediav1alpha1.Immich) error {
 	log := logf.FromContext(ctx)
 	log.V(1).Info("Reconciling Library PVC")
@@ -212,48 +214,47 @@ func (r *ImmichReconciler) reconcileLibraryPVC(ctx context.Context, immich *medi
 	name := immich.GetLibraryPVCName()
 	labels := r.getLabels(immich, "library")
 
-	pvc := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: immich.Namespace,
-			Labels:    labels,
-		},
-	}
-
-	if err := controllerutil.SetControllerReference(immich, pvc, r.Scheme); err != nil {
-		return err
-	}
-
-	// Check if PVC already exists - we can't update it
+	// Check if PVC already exists - reuse it if so
 	existing := &corev1.PersistentVolumeClaim{}
 	err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: immich.Namespace}, existing)
 	if err == nil {
-		// PVC exists, don't update
-		log.V(1).Info("Library PVC already exists", "name", name)
+		// PVC exists, reuse it (don't update - PVCs are mostly immutable)
+		log.V(1).Info("Library PVC already exists, reusing", "name", name)
 		return nil
 	}
 	if !apierrors.IsNotFound(err) {
 		return err
 	}
 
-	// Create new PVC
+	// Create new PVC (without owner reference for data safety)
 	var storageClassName *string
 	if immich.Spec.Immich.Persistence.Library.StorageClass != "" {
 		storageClassName = &immich.Spec.Immich.Persistence.Library.StorageClass
 	}
 
 	size := immich.GetLibrarySize()
-	pvc.Spec = corev1.PersistentVolumeClaimSpec{
-		AccessModes:      immich.GetLibraryAccessModes(),
-		StorageClassName: storageClassName,
-		Resources: corev1.VolumeResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceStorage: size,
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: immich.Namespace,
+			Labels:    labels,
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes:      immich.GetLibraryAccessModes(),
+			StorageClassName: storageClassName,
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: size,
+				},
 			},
 		},
 	}
 
-	log.Info("Creating Library PVC", "name", name, "size", size.String())
+	// Note: We intentionally do NOT set owner reference here.
+	// This ensures the PVC persists when the Immich CR is deleted,
+	// protecting user data and allowing reuse on CR recreation.
+
+	log.Info("Creating Library PVC (no owner reference for data safety)", "name", name, "size", size.String())
 	return r.Create(ctx, pvc)
 }
 

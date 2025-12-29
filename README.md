@@ -174,6 +174,8 @@ The operator deploys PostgreSQL by default with auto-generated credentials. Set 
 
 When using built-in PostgreSQL, credentials are automatically generated and stored in a secret named `<immich-name>-postgres-credentials`.
 
+> **Data Safety:** The PostgreSQL PVC does **NOT** have an owner reference, meaning it will **persist** when the Immich CR is deleted. This protects your database from accidental deletion. When you recreate the CR with the same name, the existing PVC will be reused automatically. To delete the PVC, you must do so manually.
+
 | Field | Description | Default |
 |-------|-------------|---------|
 | `postgres.enabled` | Deploy built-in PostgreSQL | `true` |
@@ -183,7 +185,6 @@ When using built-in PostgreSQL, credentials are automatically generated and stor
 | `postgres.persistence.size` | Data PVC size | `10Gi` |
 | `postgres.persistence.storageClass` | Storage class | (default) |
 | `postgres.persistence.existingClaim` | Use existing PVC | - |
-| `postgres.password` | Database password (plain text) | (auto-generated) |
 | `postgres.passwordSecretRef.name` | Secret name containing password | (auto-generated) |
 | `postgres.passwordSecretRef.key` | Key in the secret | - |
 
@@ -326,9 +327,11 @@ spec:
         accessModes: ["ReadWriteOnce"]  # optional, defaults to ReadWriteOnce
 ```
 
-The operator creates a PVC named `<immich-name>-library` that is owned by the Immich CR and will be deleted when the CR is deleted.
+The operator creates a PVC named `<immich-name>-library`.
 
-**Option 2: Existing PVC** (recommended)
+> **Data Safety:** The library PVC does **NOT** have an owner reference, meaning it will **persist** when the Immich CR is deleted. This protects your photos from accidental deletion. When you recreate the CR with the same name, the existing PVC will be reused automatically. To delete the PVC, you must do so manually.
+
+**Option 2: Existing PVC**
 
 Use a pre-existing PVC that you manage yourself:
 
