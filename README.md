@@ -68,7 +68,7 @@ metadata:
 
 That's it! The operator will automatically:
 
-- Create a 1Gi library PVC (override with `spec.immich.persistence.library.size`)
+- Create a default library PVC (override with `spec.immich.persistence.library.size`)
 - Deploy PostgreSQL with auto-generated credentials (stored in `<name>-postgres-credentials` secret)
 - Deploy Valkey for job queues
 - Deploy the Immich server and machine learning components
@@ -204,7 +204,7 @@ When using built-in PostgreSQL, credentials are automatically generated and stor
 |-------|-------------|---------|
 | `immich.metrics.enabled` | Enable Prometheus metrics | `false` |
 | `immich.persistence.library.existingClaim` | Use an existing PVC for photo storage | - |
-| `immich.persistence.library.size` | Size of PVC to create (if existingClaim not set) | `1Gi` |
+| `immich.persistence.library.size` | Size of PVC to create (if existingClaim not set) | `10Gi` |
 | `immich.persistence.library.storageClass` | Storage class for managed PVC | (default) |
 | `immich.persistence.library.accessModes` | Access modes for managed PVC | `["ReadWriteOnce"]` |
 | `immich.configuration` | Immich config file (YAML) | `{}` |
@@ -257,7 +257,7 @@ The operator deploys Valkey by default. Set `valkey.enabled: false` to use an ex
 | `valkey.imagePullPolicy` | Pull policy for this component | (K8s default) |
 | `valkey.resources` | Resource requirements | `{}` |
 | `valkey.persistence.enabled` | Enable data persistence | `false` |
-| `valkey.persistence.size` | Data PVC size | `1Gi` |
+| `valkey.persistence.size` | Data PVC size | `10Gi` |
 
 **External Redis/Valkey** (when `valkey.enabled: false`):
 
@@ -311,11 +311,11 @@ See the [Immich configuration documentation](https://immich.app/docs/install/con
 
 ### Library Persistence
 
-The photo library requires persistent storage. By default, the operator creates a 1Gi PVC for the library.
+The photo library requires persistent storage. By default, the operator creates a default PVC for the library.
 
 **Option 1: Operator-managed PVC** (default)
 
-Let the operator create and manage the PVC (defaults to 1Gi if not specified):
+Let the operator create and manage the PVC (has some defaults if not specified):
 
 ```yaml
 spec:

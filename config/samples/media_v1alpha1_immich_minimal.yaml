@@ -4,7 +4,7 @@ metadata:
   name: immich-minimal
 # Minimal configuration - no spec required!
 # The operator provides sensible defaults:
-# - Library PVC: 1Gi (override with spec.immich.persistence.library.size)
+# - Library PVC: 10Gi (override with spec.immich.persistence.library.size)
 # - Built-in PostgreSQL with auto-generated credentials
 # - Built-in Valkey (Redis) for job queues
 # - Default images via RELATED_IMAGE_* env vars
@@ -14,7 +14,7 @@ metadata:
 #   immich:
 #     persistence:
 #       library:
-#         size: 100Gi  # Override default 1Gi
+#         size: 100Gi  # Override default 10Gi
 #         # Or use an existing PVC:
 #         # existingClaim: my-existing-pvc
 #   postgres:

@@ -226,7 +226,7 @@ func (r *ImmichReconciler) reconcileValkeyPVC(ctx context.Context, immich *media
 
 	size := immich.Spec.Valkey.Persistence.Size
 	if size.IsZero() {
-		size = resource.MustParse("1Gi")
+		size = resource.MustParse("10Gi")
 	}
 
 	accessModes := immich.Spec.Valkey.Persistence.AccessModes

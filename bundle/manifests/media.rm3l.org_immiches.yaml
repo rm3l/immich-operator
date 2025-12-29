@@ -256,8 +256,10 @@ spec:
                               modelName:
                                 type: string
                             type: object
-                          url:
-                            type: string
+                          urls:
+                            items:
+                              type: string
+                            type: array
                         type: object
                       map:
                         description: Map configuration
@@ -451,6 +453,7 @@ spec:
                             anyOf:
                             - type: integer
                             - type: string
+                            default: 10Gi
                             description: |-
                               Size of the PVC to create for library storage.
                               Only used if existingClaim is not set.
@@ -6373,7 +6376,7 @@ spec:
                         anyOf:
                         - type: integer
                         - type: string
-                        default: 1Gi
+                        default: 10Gi
                         description: Size of the data PVC
                         pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                         x-kubernetes-int-or-string: true

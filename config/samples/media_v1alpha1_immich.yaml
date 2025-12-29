@@ -139,7 +139,7 @@ spec:
         memory: 256Mi
     persistence:
       enabled: false  # Set to true for persistent job queues
-      size: 1Gi
+      size: 5Gi
 
     # --- To use an external Redis/Valkey instead, set enabled: false ---
     # enabled: false

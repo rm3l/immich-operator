@@ -365,6 +365,7 @@ type LibraryPersistenceSpec struct {
 
 	// Size of the PVC to create for library storage.
 	// Only used if existingClaim is not set.
+	// +kubebuilder:default="10Gi"
 	// +optional
 	Size resource.Quantity `json:"size,omitempty"`
 
@@ -653,7 +654,7 @@ type ValkeyPersistenceSpec struct {
 	Enabled *bool `json:"enabled,omitempty"`
 
 	// Size of the data PVC
-	// +kubebuilder:default="1Gi"
+	// +kubebuilder:default="10Gi"
 	// +optional
 	Size resource.Quantity `json:"size,omitempty"`
 
@@ -964,12 +965,12 @@ func (i *Immich) ShouldCreateLibraryPVC() bool {
 }
 
 // GetLibrarySize returns the size for the library PVC.
-// Defaults to 1Gi if not specified.
+// Defaults to 10Gi if not specified.
 func (i *Immich) GetLibrarySize() resource.Quantity {
 	if !i.Spec.Immich.Persistence.Library.Size.IsZero() {
 		return i.Spec.Immich.Persistence.Library.Size
 	}
-	return resource.MustParse("1Gi")
+	return resource.MustParse("10Gi")
 }
 
 // GetLibraryAccessModes returns the access modes for the library PVC.
