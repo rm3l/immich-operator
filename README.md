@@ -1,12 +1,12 @@
 # Immich Operator
 
-A Kubernetes Operator for deploying and managing [Immich](https://immich.app/) - a high-performance, self-hosted photo and video management solution.
+A Kubernetes Operator for deploying and managing [Immich](https://immich.app/) (a high-performance, self-hosted photo and video management solution).
 
 ## Description
 
-This operator automates the deployment and lifecycle management of Immich on Kubernetes. It works similarly to the [official Immich Helm chart](https://github.com/immich-app/immich-charts/tree/main/charts/immich), but as a native Kubernetes operator with the following benefits:
+This operator automates the deployment and lifecycle management of Immich on Kubernetes. It provides an alternative method to the [official Immich Helm chart](https://github.com/immich-app/immich-charts/tree/main/charts/immich) for deploying and operating Immich, but as a native Kubernetes operator with the following benefits:
 
-- **Declarative Configuration**: Define your Immich deployment as a Kubernetes Custom Resource
+- **Declarative Configuration**: Define your Immich deployment as a Kubernetes Custom Resource (CR)
 - **Automated Reconciliation**: The operator continuously ensures the actual state matches your desired state
 - **Simplified Operations**: Single CR to manage all Immich components
 - **Native Kubernetes Integration**: Works with kubectl, GitOps tools, and Kubernetes RBAC
@@ -16,15 +16,9 @@ This operator automates the deployment and lifecycle management of Immich on Kub
 The operator manages the following Immich components:
 
 - **Server**: The main Immich application server (handles web UI, API, and background jobs)
-- **Machine Learning**: AI/ML service for smart search, face detection, and duplicate detection
+- **Machine Learning**: AI/ML service for smart search, face detection, and duplicate detection (built-in by default, can use external)
 - **PostgreSQL**: Database with pgvecto.rs extension (built-in by default, can use external)
 - **Valkey**: Redis-compatible cache for job queues (built-in by default, can use external)
-
-### Prerequisites
-
-- **Persistent Storage**: A StorageClass for creating PVCs (library, database, ML cache)
-
-> **Note**: PostgreSQL and Valkey are deployed by the operator by default. You can disable them and use external instances if preferred.
 
 ## Getting Started
 
@@ -34,7 +28,10 @@ The operator manages the following Immich components:
 - Docker version 17.03+
 - kubectl version v1.11.3+
 - Access to a Kubernetes v1.11.3+ cluster
-- A PostgreSQL database with `pgvecto.rs` extension
+  - **Persistent Storage**: A StorageClass for creating PVCs (library, database, ML cache)
+- If using an external PostgreSAL database, make sure it has the `pgvecto.rs` extension installed and enabled
+
+> **Note**: PostgreSQL and Valkey are deployed by the operator by default. You can disable them and use external instances if preferred.
 
 ### Installation
 
@@ -44,7 +41,7 @@ The operator manages the following Immich components:
 make install
 ```
 
-**Deploy the operator to the cluster:**
+**Deploy the operator image to the cluster:**
 
 ```sh
 make deploy IMG=<some-registry>/immich-operator:tag
@@ -55,7 +52,7 @@ make deploy IMG=<some-registry>/immich-operator:tag
 1. **Create a namespace for Immich:**
 
 ```sh
-kubectl create namespace immich
+kubectl create namespace my-ns
 ```
 
 2. **Deploy Immich (minimal):**
@@ -64,12 +61,13 @@ kubectl create namespace immich
 apiVersion: media.rm3l.org/v1alpha1
 kind: Immich
 metadata:
-  name: immich
-  namespace: immich
+  name: my-immich
+  namespace: my-ns
 # No spec required! Sensible defaults are provided.
 ```
 
 That's it! The operator will automatically:
+
 - Create a 1Gi library PVC (override with `spec.immich.persistence.library.size`)
 - Deploy PostgreSQL with auto-generated credentials (stored in `<name>-postgres-credentials` secret)
 - Deploy Valkey for job queues
@@ -81,8 +79,8 @@ That's it! The operator will automatically:
 apiVersion: media.rm3l.org/v1alpha1
 kind: Immich
 metadata:
-  name: immich
-  namespace: immich
+  name: my-immich
+  namespace: my-ns
 spec:
   # Customize library storage size
   immich:
@@ -98,13 +96,11 @@ spec:
       annotations:
         nginx.ingress.kubernetes.io/proxy-body-size: "0"
       hosts:
-        - host: immich.example.com
+        - host: my-immich.example.com
           paths:
             - path: /
               pathType: Prefix
 ```
-
-> **Note:** Images are provided via `RELATED_IMAGE_*` environment variables on the operator.
 
 ## Configuration Reference
 
@@ -330,10 +326,12 @@ This is useful when you want the PVC to persist beyond the lifecycle of the Immi
 By default, all PVCs use `ReadWriteOnce` access mode. Here's what this means for different storage types:
 
 **Network-attached storage** (NFS, Ceph, Longhorn, etc.):
+
 - Works across nodes since storage is accessible cluster-wide
 - Each component has its own PVC, so `ReadWriteOnce` is sufficient for single-replica deployments
 
 **Local storage** (local-path, hostPath, etc.):
+
 - PVCs are bound to specific nodes
 - All Immich pods must be scheduled on the same node
 - Consider using node affinity or a different storage class
@@ -394,7 +392,9 @@ spec:
     enabled: false
     host: redis.external.svc.cluster.local
     port: 6379
-    password: my-redis-password  # optional
+    passwordSecretRef: # optional
+      name: immich-redis
+      key: password
     dbIndex: 0  # optional
 ```
 
