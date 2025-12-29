@@ -398,7 +398,7 @@ func (r *ImmichReconciler) reconcilePostgresCredentials(ctx context.Context, imm
 	log := logf.FromContext(ctx)
 
 	// Skip if user provided explicit credentials
-	if immich.Spec.Postgres.PasswordSecretRef != nil || immich.Spec.Postgres.Password != "" {
+	if immich.Spec.Postgres.PasswordSecretRef != nil {
 		log.V(1).Info("Using user-provided PostgreSQL credentials")
 		return nil
 	}
@@ -471,28 +471,18 @@ func (r *ImmichReconciler) reconcilePostgresStatefulSet(ctx context.Context, imm
 		return fmt.Errorf("PostgreSQL image not configured: set spec.postgres.image or RELATED_IMAGE_postgres environment variable")
 	}
 
-	// Get password from secret (user-provided or generated)
-	var passwordEnvVar corev1.EnvVar
-	if immich.Spec.Postgres.Password != "" {
-		// Use plain text password (not recommended)
-		passwordEnvVar = corev1.EnvVar{
-			Name:  "POSTGRES_PASSWORD",
-			Value: immich.Spec.Postgres.Password,
-		}
-	} else {
-		// Use secret reference (user-provided or auto-generated)
-		secretRef := r.getPostgresPasswordSecretRef(immich)
-		passwordEnvVar = corev1.EnvVar{
-			Name: "POSTGRES_PASSWORD",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: secretRef.Name,
-					},
-					Key: secretRef.Key,
+	// Get password from secret (user-provided or auto-generated)
+	secretRef := r.getPostgresPasswordSecretRef(immich)
+	passwordEnvVar := corev1.EnvVar{
+		Name: "POSTGRES_PASSWORD",
+		ValueFrom: &corev1.EnvVarSource{
+			SecretKeyRef: &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: secretRef.Name,
 				},
+				Key: secretRef.Key,
 			},
-		}
+		},
 	}
 
 	env := []corev1.EnvVar{
@@ -1377,31 +1367,25 @@ func (r *ImmichReconciler) getServerEnv(immich *mediav1alpha1.Immich) []corev1.E
 			Value: fmt.Sprintf("%d", immich.GetValkeyPort()),
 		})
 		// Add password if configured (external Valkey)
-		if !immich.IsValkeyEnabled() {
-			if immich.Spec.Valkey.PasswordSecretRef != nil {
-				env = append(env, corev1.EnvVar{
-					Name: "REDIS_PASSWORD",
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: immich.Spec.Valkey.PasswordSecretRef.Name,
-							},
-							Key: immich.Spec.Valkey.PasswordSecretRef.Key,
+		if !immich.IsValkeyEnabled() && immich.Spec.Valkey.PasswordSecretRef != nil {
+			env = append(env, corev1.EnvVar{
+				Name: "REDIS_PASSWORD",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: immich.Spec.Valkey.PasswordSecretRef.Name,
 						},
+						Key: immich.Spec.Valkey.PasswordSecretRef.Key,
 					},
-				})
-			} else if immich.Spec.Valkey.Password != "" {
-				env = append(env, corev1.EnvVar{
-					Name:  "REDIS_PASSWORD",
-					Value: immich.Spec.Valkey.Password,
-				})
-			}
-			if immich.Spec.Valkey.DbIndex != 0 {
-				env = append(env, corev1.EnvVar{
-					Name:  "REDIS_DBINDEX",
-					Value: fmt.Sprintf("%d", immich.Spec.Valkey.DbIndex),
-				})
-			}
+				},
+			})
+		}
+		// Add DB index if configured (external Valkey)
+		if !immich.IsValkeyEnabled() && immich.Spec.Valkey.DbIndex != 0 {
+			env = append(env, corev1.EnvVar{
+				Name:  "REDIS_DBINDEX",
+				Value: fmt.Sprintf("%d", immich.Spec.Valkey.DbIndex),
+			})
 		}
 	}
 
@@ -1461,27 +1445,19 @@ func (r *ImmichReconciler) getServerEnv(immich *mediav1alpha1.Immich) []corev1.E
 			Value: immich.GetPostgresUsername(),
 		})
 
-		if immich.Spec.Postgres.Password != "" {
-			// Use plain text password (not recommended)
-			env = append(env, corev1.EnvVar{
-				Name:  "DB_PASSWORD",
-				Value: immich.Spec.Postgres.Password,
-			})
-		} else {
-			// Use secret reference (user-provided or auto-generated for built-in PostgreSQL)
-			secretRef := r.getPostgresPasswordSecretRef(immich)
-			env = append(env, corev1.EnvVar{
-				Name: "DB_PASSWORD",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: secretRef.Name,
-						},
-						Key: secretRef.Key,
+		// Use secret reference (user-provided or auto-generated for built-in PostgreSQL)
+		secretRef := r.getPostgresPasswordSecretRef(immich)
+		env = append(env, corev1.EnvVar{
+			Name: "DB_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretRef.Name,
 					},
+					Key: secretRef.Key,
 				},
-			})
-		}
+			},
+		})
 	}
 
 	return env
@@ -1891,7 +1867,7 @@ func (r *ImmichReconciler) validateImages(immich *mediav1alpha1.Immich) error {
 		if immich.Spec.Postgres.Host == "" {
 			configErrors = append(configErrors, "spec.postgres.host is required when spec.postgres.enabled=false")
 		}
-		if immich.Spec.Postgres.Password == "" && immich.Spec.Postgres.PasswordSecretRef == nil && immich.Spec.Postgres.URLSecretRef == nil {
+		if immich.Spec.Postgres.PasswordSecretRef == nil && immich.Spec.Postgres.URLSecretRef == nil {
 			configErrors = append(configErrors, "spec.postgres.password or spec.postgres.passwordSecretRef is required when spec.postgres.enabled=false")
 		}
 	}

@@ -137,5 +137,7 @@ spec:
     # enabled: false
     # host: redis.external.svc.cluster.local
     # port: 6379
-    # password: my-redis-password
+    # passwordSecretRef:
+    #   name: external-redis-secret
+    #   key: password
     # dbIndex: 0

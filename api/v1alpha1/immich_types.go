@@ -283,28 +283,34 @@ type SMTPConfig struct {
 }
 
 type SMTPTransportConfig struct {
-	Host       string `json:"host,omitempty"`
-	Port       int    `json:"port,omitempty"`
-	Username   string `json:"username,omitempty"`
-	Password   string `json:"password,omitempty"`
-	IgnoreCert bool   `json:"ignoreCert,omitempty"`
+	Host string `json:"host,omitempty"`
+	Port int    `json:"port,omitempty"`
+	// Username for SMTP authentication
+	// +optional
+	Username string `json:"username,omitempty"`
+	// Reference to a secret containing the SMTP password
+	// +optional
+	PasswordSecretRef *SecretKeySelector `json:"passwordSecretRef,omitempty"`
+	IgnoreCert        bool               `json:"ignoreCert,omitempty"`
 }
 
 // OAuthConfig defines OAuth settings
 type OAuthConfig struct {
-	Enabled               bool   `json:"enabled,omitempty"`
-	IssuerURL             string `json:"issuerUrl,omitempty"`
-	ClientID              string `json:"clientId,omitempty"`
-	ClientSecret          string `json:"clientSecret,omitempty"`
-	Scope                 string `json:"scope,omitempty"`
-	StorageLabel          string `json:"storageLabelClaim,omitempty"`
-	StorageQuota          string `json:"storageQuotaClaim,omitempty"`
-	DefaultStorageQuota   int64  `json:"defaultStorageQuota,omitempty"`
-	ButtonText            string `json:"buttonText,omitempty"`
-	AutoRegister          bool   `json:"autoRegister,omitempty"`
-	AutoLaunch            bool   `json:"autoLaunch,omitempty"`
-	MobileOverrideEnabled bool   `json:"mobileOverrideEnabled,omitempty"`
-	MobileRedirectURI     string `json:"mobileRedirectUri,omitempty"`
+	Enabled   bool   `json:"enabled,omitempty"`
+	IssuerURL string `json:"issuerUrl,omitempty"`
+	ClientID  string `json:"clientId,omitempty"`
+	// Reference to a secret containing the OAuth client secret
+	// +optional
+	ClientSecretRef       *SecretKeySelector `json:"clientSecretRef,omitempty"`
+	Scope                 string             `json:"scope,omitempty"`
+	StorageLabel          string             `json:"storageLabelClaim,omitempty"`
+	StorageQuota          string             `json:"storageQuotaClaim,omitempty"`
+	DefaultStorageQuota   int64              `json:"defaultStorageQuota,omitempty"`
+	ButtonText            string             `json:"buttonText,omitempty"`
+	AutoRegister          bool               `json:"autoRegister,omitempty"`
+	AutoLaunch            bool               `json:"autoLaunch,omitempty"`
+	MobileOverrideEnabled bool               `json:"mobileOverrideEnabled,omitempty"`
+	MobileRedirectURI     string             `json:"mobileRedirectUri,omitempty"`
 }
 
 // PasswordLoginConfig defines password login settings
@@ -601,10 +607,6 @@ type ValkeySpec struct {
 	// +optional
 	DbIndex int32 `json:"dbIndex,omitempty"`
 
-	// Password for Redis authentication
-	// +optional
-	Password string `json:"password,omitempty"`
-
 	// Reference to a secret containing the Redis password
 	// +optional
 	PasswordSecretRef *SecretKeySelector `json:"passwordSecretRef,omitempty"`
@@ -731,11 +733,8 @@ type PostgresSpec struct {
 	// +optional
 	Username string `json:"username,omitempty"`
 
-	// Password for database connection (plain text - prefer PasswordSecretRef)
-	// +optional
-	Password string `json:"password,omitempty"`
-
 	// Reference to a secret containing the password
+	// Required if enabled is false and URLSecretRef is not set
 	// +optional
 	PasswordSecretRef *SecretKeySelector `json:"passwordSecretRef,omitempty"`
 

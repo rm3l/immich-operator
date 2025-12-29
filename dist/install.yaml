@@ -300,11 +300,24 @@ spec:
                                     type: string
                                   ignoreCert:
                                     type: boolean
-                                  password:
-                                    type: string
+                                  passwordSecretRef:
+                                    description: Reference to a secret containing
+                                      the SMTP password
+                                    properties:
+                                      key:
+                                        description: Key in the secret
+                                        type: string
+                                      name:
+                                        description: Name of the secret
+                                        type: string
+                                    required:
+                                    - key
+                                    - name
+                                    type: object
                                   port:
                                     type: integer
                                   username:
+                                    description: Username for SMTP authentication
                                     type: string
                                 type: object
                             type: object
@@ -320,8 +333,20 @@ spec:
                             type: string
                           clientId:
                             type: string
-                          clientSecret:
-                            type: string
+                          clientSecretRef:
+                            description: Reference to a secret containing the OAuth
+                              client secret
+                            properties:
+                              key:
+                                description: Key in the secret
+                                type: string
+                              name:
+                                description: Name of the secret
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
                           defaultStorageQuota:
                             format: int64
                             type: integer
@@ -3069,12 +3094,10 @@ spec:
                       type: string
                     description: Node selector
                     type: object
-                  password:
-                    description: Password for database connection (plain text - prefer
-                      PasswordSecretRef)
-                    type: string
                   passwordSecretRef:
-                    description: Reference to a secret containing the password
+                    description: |-
+                      Reference to a secret containing the password
+                      Required if enabled is false and URLSecretRef is not set
                     properties:
                       key:
                         description: Key in the secret
@@ -6318,9 +6341,6 @@ spec:
                       type: string
                     description: Node selector
                     type: object
-                  password:
-                    description: Password for Redis authentication
-                    type: string
                   passwordSecretRef:
                     description: Reference to a secret containing the Redis password
                     properties:
