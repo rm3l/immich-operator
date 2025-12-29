@@ -256,8 +256,10 @@ spec:
                               modelName:
                                 type: string
                             type: object
-                          url:
-                            type: string
+                          urls:
+                            items:
+                              type: string
+                            type: array
                         type: object
                       map:
                         description: Map configuration

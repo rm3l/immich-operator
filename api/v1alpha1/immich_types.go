@@ -231,10 +231,11 @@ type LoggingConfig struct {
 	Level   string `json:"level,omitempty"`
 }
 
-// MachineLearningConfig defines ML settings in immich config
+// MachineLearningConfig defines ML settings in immich config.
+// Follows the structure from https://docs.immich.app/install/config-file/
 type MachineLearningConfig struct {
 	Enabled            bool                      `json:"enabled,omitempty"`
-	URL                string                    `json:"url,omitempty"`
+	URLs               []string                  `json:"urls,omitempty"`
 	Clip               *ClipConfig               `json:"clip,omitempty"`
 	DuplicateDetection *DuplicateDetectionConfig `json:"duplicateDetection,omitempty"`
 	FacialRecognition  *FacialRecognitionConfig  `json:"facialRecognition,omitempty"`
