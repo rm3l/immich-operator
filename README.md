@@ -225,15 +225,23 @@ When using built-in PostgreSQL, credentials are automatically generated and stor
 
 ### Machine Learning Configuration
 
+The operator deploys the ML component by default. Set `machineLearning.enabled: false` to use an external ML service.
+
 | Field | Description | Default |
 |-------|-------------|---------|
-| `machineLearning.enabled` | Enable ML component | `true` |
+| `machineLearning.enabled` | Deploy built-in ML component | `true` |
 | `machineLearning.image` | Override default image | `RELATED_IMAGE_machineLearning` |
 | `machineLearning.imagePullPolicy` | Pull policy for this component | (K8s default) |
 | `machineLearning.replicas` | Number of replicas | `1` |
 | `machineLearning.resources` | Resource requirements | `{}` |
 | `machineLearning.persistence.enabled` | Enable cache persistence | `true` |
 | `machineLearning.persistence.size` | Cache PVC size | `10Gi` |
+
+**External ML Service** (when `machineLearning.enabled: false`):
+
+| Field | Description | Default |
+|-------|-------------|---------|
+| `machineLearning.url` | URL of external ML service | Required |
 
 ### Valkey (Redis) Configuration
 
@@ -397,6 +405,23 @@ spec:
       key: password
     dbIndex: 0  # optional
 ```
+
+### External Machine Learning Service
+
+To use an external ML service instead of the built-in one:
+
+```yaml
+spec:
+  machineLearning:
+    enabled: false
+    url: http://external-ml-service:3003
+```
+
+This is useful for:
+
+- Running ML inference on dedicated hardware (e.g., GPU nodes)
+- Sharing a single ML service across multiple Immich instances
+- Using a custom ML service implementation
 
 ## Status
 

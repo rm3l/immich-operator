@@ -98,8 +98,9 @@ spec:
             - immich.example.com
           secretName: immich-tls
 
-  # Machine Learning component configuration
+  # Machine Learning component configuration (built-in by default)
   machineLearning:
+    # Built-in ML is enabled by default
     enabled: true
     replicas: 1
     # Image is optional - defaults to RELATED_IMAGE_machineLearning env var
@@ -115,6 +116,10 @@ spec:
       enabled: true
       size: 10Gi
       # storageClass: standard
+
+    # --- To use an external ML service instead, set enabled: false ---
+    # enabled: false
+    # url: http://external-ml-service:3003
 
   # Valkey (Redis) component configuration (built-in by default)
   valkey:

@@ -446,8 +446,11 @@ type ServerSpec struct {
 }
 
 // MachineLearningSpec defines the machine learning component configuration.
+// When enabled=true (default), the operator deploys an ML Deployment.
+// When enabled=false, you must provide an external ML service URL.
 type MachineLearningSpec struct {
-	// Enable the machine learning component
+	// Enable the built-in machine learning component
+	// Set to false if using an external ML service
 	// +kubebuilder:default=true
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
@@ -509,6 +512,13 @@ type MachineLearningSpec struct {
 	// SecurityContext for the container
 	// +optional
 	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
+
+	// --- External ML service configuration (used when enabled=false) ---
+
+	// URL of the external ML service (required when enabled=false)
+	// Example: "http://external-ml-service:3003"
+	// +optional
+	URL string `json:"url,omitempty"`
 }
 
 // MachineLearningPersistenceSpec defines ML cache persistence.
@@ -1050,4 +1060,13 @@ func (i *Immich) GetValkeyPort() int32 {
 		return 6379
 	}
 	return i.Spec.Valkey.Port
+}
+
+// GetMachineLearningURL returns the URL for the machine learning service.
+// If built-in is enabled, returns the internal service URL. Otherwise returns the external URL.
+func (i *Immich) GetMachineLearningURL() string {
+	if i.IsMachineLearningEnabled() {
+		return "http://" + i.Name + "-machine-learning:3003"
+	}
+	return i.Spec.MachineLearning.URL
 }

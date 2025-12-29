@@ -224,11 +224,12 @@ func (r *ImmichReconciler) getServerEnv(immich *mediav1alpha1.Immich) []corev1.E
 		}
 	}
 
-	// Machine Learning URL
-	if immich.IsMachineLearningEnabled() {
+	// Machine Learning URL (built-in or external)
+	mlURL := immich.GetMachineLearningURL()
+	if mlURL != "" {
 		env = append(env, corev1.EnvVar{
 			Name:  "IMMICH_MACHINE_LEARNING_URL",
-			Value: fmt.Sprintf("http://%s-machine-learning:3003", immich.Name),
+			Value: mlURL,
 		})
 	}
 
