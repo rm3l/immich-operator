@@ -25,7 +25,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1787,38 +1786,19 @@ func (r *ImmichReconciler) mergeMaps(base, override map[string]string) map[strin
 func (r *ImmichReconciler) createOrUpdate(ctx context.Context, obj client.Object, mutate func() error) error {
 	log := logf.FromContext(ctx)
 
-	key := types.NamespacedName{
-		Name:      obj.GetName(),
-		Namespace: obj.GetNamespace(),
-	}
-
-	existing := obj.DeepCopyObject().(client.Object)
-	err := r.Get(ctx, key, existing)
+	result, err := controllerutil.CreateOrUpdate(ctx, r.Client, obj, mutate)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// Object doesn't exist, create it
-			if err := mutate(); err != nil {
-				return err
-			}
-			log.Info("Creating resource", "kind", obj.GetObjectKind().GroupVersionKind().Kind, "name", obj.GetName())
-			return r.Create(ctx, obj)
-		}
 		return err
 	}
 
-	// Object exists, update it
-	obj.SetResourceVersion(existing.GetResourceVersion())
-	if err := mutate(); err != nil {
-		return err
+	switch result {
+	case controllerutil.OperationResultCreated:
+		log.Info("Created resource", "kind", obj.GetObjectKind().GroupVersionKind().Kind, "name", obj.GetName())
+	case controllerutil.OperationResultUpdated:
+		log.V(1).Info("Updated resource", "kind", obj.GetObjectKind().GroupVersionKind().Kind, "name", obj.GetName())
 	}
 
-	// Check if update is needed
-	if equality.Semantic.DeepEqual(existing, obj) {
-		return nil
-	}
-
-	log.V(1).Info("Updating resource", "kind", obj.GetObjectKind().GroupVersionKind().Kind, "name", obj.GetName())
-	return r.Update(ctx, obj)
+	return nil
 }
 
 // validateImages checks that all required images are configured
