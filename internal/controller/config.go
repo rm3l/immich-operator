@@ -36,7 +36,6 @@ func (r *ImmichReconciler) reconcileImmichConfig(ctx context.Context, immich *me
 	log.V(1).Info("Reconciling Immich configuration")
 
 	configName := fmt.Sprintf("%s-immich-config", immich.Name)
-	immichConfig := ptr.Deref(immich.Spec.Immich, mediav1alpha1.ImmichConfig{})
 
 	// Build effective configuration by merging base config with user config
 	effectiveConfig := r.buildEffectiveConfigMap(immich)
@@ -49,7 +48,7 @@ func (r *ImmichReconciler) reconcileImmichConfig(ctx context.Context, immich *me
 
 	labels := r.getLabels(immich, "config")
 
-	if immichConfig.ConfigurationKind == "Secret" {
+	if immich.GetConfigurationKind() == "Secret" {
 		secret := &corev1.Secret{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: corev1.SchemeGroupVersion.String(),
@@ -137,7 +136,7 @@ func (r *ImmichReconciler) applyMLConfigMap(immich *mediav1alpha1.Immich, config
 
 	// Determine if ML should be enabled
 	// ML is enabled if: built-in is enabled OR external URL is provided
-	mlEnabled := immich.IsMachineLearningEnabled() || mlSpec.URL != ""
+	mlEnabled := immich.IsMachineLearningEnabled() || (mlSpec.URL != nil && *mlSpec.URL != "")
 
 	// Build ML config map with only non-empty values
 	// Note: Immich uses "urls" (array) not "url" (string)

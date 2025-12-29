@@ -171,13 +171,13 @@ func (r *ImmichReconciler) reconcilePostgresStatefulSet(ctx context.Context, imm
 
 	// Build volumes - only needed if using an existing claim
 	var volumes []corev1.Volume
-	if persistence.ExistingClaim != "" {
+	if persistence.ExistingClaim != nil && *persistence.ExistingClaim != "" {
 		volumes = []corev1.Volume{
 			{
 				Name: "data",
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: persistence.ExistingClaim,
+						ClaimName: *persistence.ExistingClaim,
 					},
 				},
 			},
@@ -186,10 +186,10 @@ func (r *ImmichReconciler) reconcilePostgresStatefulSet(ctx context.Context, imm
 
 	// Build VolumeClaimTemplate for automatic PVC management (if not using existing claim)
 	var volumeClaimTemplates []corev1.PersistentVolumeClaim
-	if persistence.ExistingClaim == "" {
-		size := persistence.Size
-		if size.IsZero() {
-			size = resource.MustParse("10Gi")
+	if persistence.ExistingClaim == nil || *persistence.ExistingClaim == "" {
+		size := resource.MustParse("10Gi")
+		if persistence.Size != nil && !persistence.Size.IsZero() {
+			size = *persistence.Size
 		}
 
 		accessModes := persistence.AccessModes

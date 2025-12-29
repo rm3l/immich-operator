@@ -81,7 +81,7 @@ type ImmichConfig struct {
 	// Must be either ConfigMap or Secret. Defaults to ConfigMap.
 	// +kubebuilder:validation:Enum=ConfigMap;Secret
 	// +optional
-	ConfigurationKind string `json:"configurationKind,omitempty"`
+	ConfigurationKind *string `json:"configurationKind,omitempty"`
 }
 
 // ConfigurationSpec holds the raw Immich configuration
@@ -155,188 +155,274 @@ type ConfigurationSpec struct {
 // TrashConfig defines trash bin settings
 type TrashConfig struct {
 	// +kubebuilder:default=true
-	Enabled bool `json:"enabled,omitempty"`
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
 	// +kubebuilder:default=30
-	Days int `json:"days,omitempty"`
+	// +optional
+	Days *int `json:"days,omitempty"`
 }
 
 // StorageTemplateConfig defines storage template settings
 type StorageTemplateConfig struct {
-	Enabled  bool   `json:"enabled,omitempty"`
-	Template string `json:"template,omitempty"`
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+	// +optional
+	Template *string `json:"template,omitempty"`
 }
 
 // FFmpegConfig defines FFmpeg transcoding settings
 type FFmpegConfig struct {
-	CRF                 int      `json:"crf,omitempty"`
-	Threads             int      `json:"threads,omitempty"`
-	Preset              string   `json:"preset,omitempty"`
-	TargetCodec         string   `json:"targetVideoCodec,omitempty"`
+	// +optional
+	CRF *int `json:"crf,omitempty"`
+	// +optional
+	Threads *int `json:"threads,omitempty"`
+	// +optional
+	Preset *string `json:"preset,omitempty"`
+	// +optional
+	TargetCodec *string `json:"targetVideoCodec,omitempty"`
+	// +optional
 	AcceptedAudioCodecs []string `json:"acceptedAudioCodecs,omitempty"`
-	TargetResolution    string   `json:"targetResolution,omitempty"`
-	MaxBitrate          string   `json:"maxBitrate,omitempty"`
-	Bframes             int      `json:"bframes,omitempty"`
-	Refs                int      `json:"refs,omitempty"`
-	GOPSize             int      `json:"gopSize,omitempty"`
-	NPL                 int      `json:"npl,omitempty"`
-	TemporalAQ          bool     `json:"temporalAQ,omitempty"`
-	CQMode              string   `json:"cqMode,omitempty"`
-	TwoPass             bool     `json:"twoPass,omitempty"`
-	PreferredHwDevice   string   `json:"preferredHwDevice,omitempty"`
-	TranscodePolicy     string   `json:"transcode,omitempty"`
-	ToneMappingMode     string   `json:"tonemap,omitempty"`
-	Accel               string   `json:"accel,omitempty"`
-	AccelDecode         bool     `json:"accelDecode,omitempty"`
+	// +optional
+	TargetResolution *string `json:"targetResolution,omitempty"`
+	// +optional
+	MaxBitrate *string `json:"maxBitrate,omitempty"`
+	// +optional
+	Bframes *int `json:"bframes,omitempty"`
+	// +optional
+	Refs *int `json:"refs,omitempty"`
+	// +optional
+	GOPSize *int `json:"gopSize,omitempty"`
+	// +optional
+	NPL *int `json:"npl,omitempty"`
+	// +optional
+	TemporalAQ *bool `json:"temporalAQ,omitempty"`
+	// +optional
+	CQMode *string `json:"cqMode,omitempty"`
+	// +optional
+	TwoPass *bool `json:"twoPass,omitempty"`
+	// +optional
+	PreferredHwDevice *string `json:"preferredHwDevice,omitempty"`
+	// +optional
+	TranscodePolicy *string `json:"transcode,omitempty"`
+	// +optional
+	ToneMappingMode *string `json:"tonemap,omitempty"`
+	// +optional
+	Accel *string `json:"accel,omitempty"`
+	// +optional
+	AccelDecode *bool `json:"accelDecode,omitempty"`
 }
 
 // JobConfig defines job concurrency settings
 type JobConfig struct {
-	BackgroundTask      *JobConcurrency `json:"backgroundTask,omitempty"`
-	SmartSearch         *JobConcurrency `json:"smartSearch,omitempty"`
-	MetadataExtraction  *JobConcurrency `json:"metadataExtraction,omitempty"`
-	Search              *JobConcurrency `json:"search,omitempty"`
-	FaceDetection       *JobConcurrency `json:"faceDetection,omitempty"`
-	Sidecar             *JobConcurrency `json:"sidecar,omitempty"`
-	Library             *JobConcurrency `json:"library,omitempty"`
-	Migration           *JobConcurrency `json:"migration,omitempty"`
+	// +optional
+	BackgroundTask *JobConcurrency `json:"backgroundTask,omitempty"`
+	// +optional
+	SmartSearch *JobConcurrency `json:"smartSearch,omitempty"`
+	// +optional
+	MetadataExtraction *JobConcurrency `json:"metadataExtraction,omitempty"`
+	// +optional
+	Search *JobConcurrency `json:"search,omitempty"`
+	// +optional
+	FaceDetection *JobConcurrency `json:"faceDetection,omitempty"`
+	// +optional
+	Sidecar *JobConcurrency `json:"sidecar,omitempty"`
+	// +optional
+	Library *JobConcurrency `json:"library,omitempty"`
+	// +optional
+	Migration *JobConcurrency `json:"migration,omitempty"`
+	// +optional
 	ThumbnailGeneration *JobConcurrency `json:"thumbnailGeneration,omitempty"`
-	VideoConversion     *JobConcurrency `json:"videoConversion,omitempty"`
-	Notifications       *JobConcurrency `json:"notifications,omitempty"`
+	// +optional
+	VideoConversion *JobConcurrency `json:"videoConversion,omitempty"`
+	// +optional
+	Notifications *JobConcurrency `json:"notifications,omitempty"`
 }
 
 // JobConcurrency defines concurrency for a specific job type
 type JobConcurrency struct {
-	Concurrency int `json:"concurrency,omitempty"`
+	// +optional
+	Concurrency *int `json:"concurrency,omitempty"`
 }
 
 // LibraryConfig defines library scanning settings
 type LibraryConfig struct {
-	Scan  *LibraryScanConfig  `json:"scan,omitempty"`
+	// +optional
+	Scan *LibraryScanConfig `json:"scan,omitempty"`
+	// +optional
 	Watch *LibraryWatchConfig `json:"watch,omitempty"`
 }
 
 type LibraryScanConfig struct {
-	Enabled        bool   `json:"enabled,omitempty"`
-	CronExpression string `json:"cronExpression,omitempty"`
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+	// +optional
+	CronExpression *string `json:"cronExpression,omitempty"`
 }
 
 type LibraryWatchConfig struct {
-	Enabled bool `json:"enabled,omitempty"`
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
 }
 
 // LoggingConfig defines logging settings
 type LoggingConfig struct {
-	Enabled bool   `json:"enabled,omitempty"`
-	Level   string `json:"level,omitempty"`
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+	// +optional
+	Level *string `json:"level,omitempty"`
 }
 
 // MachineLearningConfig defines ML settings in immich config.
 // Follows the structure from https://docs.immich.app/install/config-file/
 type MachineLearningConfig struct {
-	Enabled            bool                      `json:"enabled,omitempty"`
-	URLs               []string                  `json:"urls,omitempty"`
-	Clip               *ClipConfig               `json:"clip,omitempty"`
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+	// +optional
+	URLs []string `json:"urls,omitempty"`
+	// +optional
+	Clip *ClipConfig `json:"clip,omitempty"`
+	// +optional
 	DuplicateDetection *DuplicateDetectionConfig `json:"duplicateDetection,omitempty"`
-	FacialRecognition  *FacialRecognitionConfig  `json:"facialRecognition,omitempty"`
+	// +optional
+	FacialRecognition *FacialRecognitionConfig `json:"facialRecognition,omitempty"`
 }
 
 type ClipConfig struct {
-	Enabled   bool   `json:"enabled,omitempty"`
-	ModelName string `json:"modelName,omitempty"`
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+	// +optional
+	ModelName *string `json:"modelName,omitempty"`
 }
 
 type DuplicateDetectionConfig struct {
-	Enabled     bool   `json:"enabled,omitempty"`
-	MaxDistance string `json:"maxDistance,omitempty"`
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+	// +optional
+	MaxDistance *string `json:"maxDistance,omitempty"`
 }
 
 type FacialRecognitionConfig struct {
-	Enabled     bool   `json:"enabled,omitempty"`
-	ModelName   string `json:"modelName,omitempty"`
-	MinScore    string `json:"minScore,omitempty"`
-	MaxDistance string `json:"maxDistance,omitempty"`
-	MinFaces    int    `json:"minFaces,omitempty"`
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+	// +optional
+	ModelName *string `json:"modelName,omitempty"`
+	// +optional
+	MinScore *string `json:"minScore,omitempty"`
+	// +optional
+	MaxDistance *string `json:"maxDistance,omitempty"`
+	// +optional
+	MinFaces *int `json:"minFaces,omitempty"`
 }
 
 // MapConfig defines map settings
 type MapConfig struct {
-	Enabled    bool   `json:"enabled,omitempty"`
-	LightStyle string `json:"lightStyle,omitempty"`
-	DarkStyle  string `json:"darkStyle,omitempty"`
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+	// +optional
+	LightStyle *string `json:"lightStyle,omitempty"`
+	// +optional
+	DarkStyle *string `json:"darkStyle,omitempty"`
 }
 
 // NewVersionCheckConfig defines version check settings
 type NewVersionCheckConfig struct {
-	Enabled bool `json:"enabled,omitempty"`
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
 }
 
 // NotificationsConfig defines notification settings
 type NotificationsConfig struct {
+	// +optional
 	SMTP *SMTPConfig `json:"smtp,omitempty"`
 }
 
 type SMTPConfig struct {
-	Enabled   bool                 `json:"enabled,omitempty"`
-	From      string               `json:"from,omitempty"`
-	ReplyTo   string               `json:"replyTo,omitempty"`
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+	// +optional
+	From *string `json:"from,omitempty"`
+	// +optional
+	ReplyTo *string `json:"replyTo,omitempty"`
+	// +optional
 	Transport *SMTPTransportConfig `json:"transport,omitempty"`
 }
 
 type SMTPTransportConfig struct {
-	Host string `json:"host,omitempty"`
-	Port int    `json:"port,omitempty"`
+	// +optional
+	Host *string `json:"host,omitempty"`
+	// +optional
+	Port *int `json:"port,omitempty"`
 	// Username for SMTP authentication
 	// +optional
-	Username string `json:"username,omitempty"`
+	Username *string `json:"username,omitempty"`
 	// Reference to a secret containing the SMTP password
 	// +optional
 	PasswordSecretRef *SecretKeySelector `json:"passwordSecretRef,omitempty"`
-	IgnoreCert        bool               `json:"ignoreCert,omitempty"`
+	// +optional
+	IgnoreCert *bool `json:"ignoreCert,omitempty"`
 }
 
 // OAuthConfig defines OAuth settings
 type OAuthConfig struct {
-	Enabled   bool   `json:"enabled,omitempty"`
-	IssuerURL string `json:"issuerUrl,omitempty"`
-	ClientID  string `json:"clientId,omitempty"`
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+	// +optional
+	IssuerURL *string `json:"issuerUrl,omitempty"`
+	// +optional
+	ClientID *string `json:"clientId,omitempty"`
 	// Reference to a secret containing the OAuth client secret
 	// +optional
-	ClientSecretRef       *SecretKeySelector `json:"clientSecretRef,omitempty"`
-	Scope                 string             `json:"scope,omitempty"`
-	StorageLabel          string             `json:"storageLabelClaim,omitempty"`
-	StorageQuota          string             `json:"storageQuotaClaim,omitempty"`
-	DefaultStorageQuota   int64              `json:"defaultStorageQuota,omitempty"`
-	ButtonText            string             `json:"buttonText,omitempty"`
-	AutoRegister          bool               `json:"autoRegister,omitempty"`
-	AutoLaunch            bool               `json:"autoLaunch,omitempty"`
-	MobileOverrideEnabled bool               `json:"mobileOverrideEnabled,omitempty"`
-	MobileRedirectURI     string             `json:"mobileRedirectUri,omitempty"`
+	ClientSecretRef *SecretKeySelector `json:"clientSecretRef,omitempty"`
+	// +optional
+	Scope *string `json:"scope,omitempty"`
+	// +optional
+	StorageLabel *string `json:"storageLabelClaim,omitempty"`
+	// +optional
+	StorageQuota *string `json:"storageQuotaClaim,omitempty"`
+	// +optional
+	DefaultStorageQuota *int64 `json:"defaultStorageQuota,omitempty"`
+	// +optional
+	ButtonText *string `json:"buttonText,omitempty"`
+	// +optional
+	AutoRegister *bool `json:"autoRegister,omitempty"`
+	// +optional
+	AutoLaunch *bool `json:"autoLaunch,omitempty"`
+	// +optional
+	MobileOverrideEnabled *bool `json:"mobileOverrideEnabled,omitempty"`
+	// +optional
+	MobileRedirectURI *string `json:"mobileRedirectUri,omitempty"`
 }
 
 // PasswordLoginConfig defines password login settings
 type PasswordLoginConfig struct {
-	Enabled bool `json:"enabled,omitempty"`
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
 }
 
 // ReverseGeocodingConfig defines reverse geocoding settings
 type ReverseGeocodingConfig struct {
-	Enabled bool `json:"enabled,omitempty"`
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
 }
 
 // ServerConfig defines server-side settings
 type ServerConfig struct {
-	ExternalDomain   string `json:"externalDomain,omitempty"`
-	LoginPageMessage string `json:"loginPageMessage,omitempty"`
+	// +optional
+	ExternalDomain *string `json:"externalDomain,omitempty"`
+	// +optional
+	LoginPageMessage *string `json:"loginPageMessage,omitempty"`
 }
 
 // ThemeConfig defines theme settings
 type ThemeConfig struct {
-	CustomCSS string `json:"customCss,omitempty"`
+	// +optional
+	CustomCSS *string `json:"customCss,omitempty"`
 }
 
 // UserConfig defines user settings
 type UserConfig struct {
-	DeleteDelay int `json:"deleteDelay,omitempty"`
+	// +optional
+	DeleteDelay *int `json:"deleteDelay,omitempty"`
 }
 
 // MetricsSpec defines Prometheus metrics configuration.
@@ -344,7 +430,7 @@ type MetricsSpec struct {
 	// Enable Prometheus metrics and ServiceMonitor creation
 	// +kubebuilder:default=false
 	// +optional
-	Enabled bool `json:"enabled,omitempty"`
+	Enabled *bool `json:"enabled,omitempty"`
 }
 
 // PersistenceSpec defines persistence configuration.
@@ -360,18 +446,18 @@ type LibraryPersistenceSpec struct {
 	// ExistingClaim is the name of an existing PVC to use for library storage.
 	// If set, the operator will use this PVC instead of creating a new one.
 	// +optional
-	ExistingClaim string `json:"existingClaim,omitempty"`
+	ExistingClaim *string `json:"existingClaim,omitempty"`
 
 	// Size of the PVC to create for library storage.
 	// Only used if existingClaim is not set.
 	// +kubebuilder:default="10Gi"
 	// +optional
-	Size resource.Quantity `json:"size,omitempty"`
+	Size *resource.Quantity `json:"size,omitempty"`
 
 	// StorageClass for the PVC. If not set, the default storage class is used.
 	// Only used if existingClaim is not set.
 	// +optional
-	StorageClass string `json:"storageClass,omitempty"`
+	StorageClass *string `json:"storageClass,omitempty"`
 
 	// AccessModes for the PVC.
 	// Only used if existingClaim is not set.
@@ -390,7 +476,7 @@ type ServerSpec struct {
 	// Image is the full image reference (e.g., "ghcr.io/immich-app/immich-server:v1.125.7")
 	// If not set, defaults to RELATED_IMAGE_immich environment variable
 	// +optional
-	Image string `json:"image,omitempty"`
+	Image *string `json:"image,omitempty"`
 
 	// ImagePullPolicy overrides the default pull policy for this component
 	// +optional
@@ -460,7 +546,7 @@ type MachineLearningSpec struct {
 	// Image is the full image reference (e.g., "ghcr.io/immich-app/immich-machine-learning:v1.125.7")
 	// If not set, defaults to RELATED_IMAGE_machineLearning environment variable
 	// +optional
-	Image string `json:"image,omitempty"`
+	Image *string `json:"image,omitempty"`
 
 	// ImagePullPolicy overrides the default pull policy for this component
 	// +optional
@@ -521,7 +607,7 @@ type MachineLearningSpec struct {
 	// If not set when enabled=false, Immich runs without ML features
 	// Example: "http://external-ml-service:3003"
 	// +optional
-	URL string `json:"url,omitempty"`
+	URL *string `json:"url,omitempty"`
 }
 
 // MachineLearningPersistenceSpec defines ML cache persistence.
@@ -534,7 +620,7 @@ type MachineLearningPersistenceSpec struct {
 	// Size of the cache PVC
 	// +kubebuilder:default="10Gi"
 	// +optional
-	Size resource.Quantity `json:"size,omitempty"`
+	Size *resource.Quantity `json:"size,omitempty"`
 
 	// StorageClass for the cache PVC
 	// +optional
@@ -546,7 +632,7 @@ type MachineLearningPersistenceSpec struct {
 
 	// Use an existing PVC instead of creating one
 	// +optional
-	ExistingClaim string `json:"existingClaim,omitempty"`
+	ExistingClaim *string `json:"existingClaim,omitempty"`
 }
 
 // ValkeySpec defines the Valkey (Redis) component configuration.
@@ -562,7 +648,7 @@ type ValkeySpec struct {
 	// Image is the full image reference (e.g., "docker.io/valkey/valkey:9-alpine")
 	// If not set, defaults to RELATED_IMAGE_valkey environment variable
 	// +optional
-	Image string `json:"image,omitempty"`
+	Image *string `json:"image,omitempty"`
 
 	// ImagePullPolicy overrides the default pull policy for this component
 	// +optional
@@ -608,17 +694,17 @@ type ValkeySpec struct {
 
 	// Hostname of the external Redis/Valkey server (required when enabled=false)
 	// +optional
-	Host string `json:"host,omitempty"`
+	Host *string `json:"host,omitempty"`
 
 	// Port of the external Redis/Valkey server
 	// +kubebuilder:default=6379
 	// +optional
-	Port int32 `json:"port,omitempty"`
+	Port *int32 `json:"port,omitempty"`
 
 	// Database index to use (0-15)
 	// +kubebuilder:default=0
 	// +optional
-	DbIndex int32 `json:"dbIndex,omitempty"`
+	DbIndex *int32 `json:"dbIndex,omitempty"`
 
 	// Reference to a secret containing the Redis password
 	// +optional
@@ -630,7 +716,7 @@ type PostgresPersistenceSpec struct {
 	// Size of the data PVC
 	// +kubebuilder:default="10Gi"
 	// +optional
-	Size resource.Quantity `json:"size,omitempty"`
+	Size *resource.Quantity `json:"size,omitempty"`
 
 	// StorageClass for the data PVC
 	// +optional
@@ -642,7 +728,7 @@ type PostgresPersistenceSpec struct {
 
 	// Use an existing PVC instead of creating one
 	// +optional
-	ExistingClaim string `json:"existingClaim,omitempty"`
+	ExistingClaim *string `json:"existingClaim,omitempty"`
 }
 
 // ValkeyPersistenceSpec defines Valkey persistence.
@@ -655,7 +741,7 @@ type ValkeyPersistenceSpec struct {
 	// Size of the data PVC
 	// +kubebuilder:default="10Gi"
 	// +optional
-	Size resource.Quantity `json:"size,omitempty"`
+	Size *resource.Quantity `json:"size,omitempty"`
 
 	// StorageClass for the data PVC
 	// +optional
@@ -667,7 +753,7 @@ type ValkeyPersistenceSpec struct {
 
 	// Use an existing PVC instead of creating one
 	// +optional
-	ExistingClaim string `json:"existingClaim,omitempty"`
+	ExistingClaim *string `json:"existingClaim,omitempty"`
 }
 
 // PostgresSpec defines PostgreSQL database configuration.
@@ -684,7 +770,7 @@ type PostgresSpec struct {
 	// Must include the pgvecto.rs extension for Immich to work
 	// If not set, defaults to RELATED_IMAGE_postgres environment variable
 	// +optional
-	Image string `json:"image,omitempty"`
+	Image *string `json:"image,omitempty"`
 
 	// ImagePullPolicy overrides the default pull policy for this component
 	// +optional
@@ -729,22 +815,23 @@ type PostgresSpec struct {
 	// --- External PostgreSQL configuration (used when enabled=false) ---
 
 	// Hostname of the external PostgreSQL server (required when enabled=false)
-	Host string `json:"host,omitempty"`
+	// +optional
+	Host *string `json:"host,omitempty"`
 
 	// Port of the PostgreSQL server
 	// +kubebuilder:default=5432
 	// +optional
-	Port int32 `json:"port,omitempty"`
+	Port *int32 `json:"port,omitempty"`
 
 	// Database name
 	// +kubebuilder:default="immich"
 	// +optional
-	Database string `json:"database,omitempty"`
+	Database *string `json:"database,omitempty"`
 
 	// Username for database connection
 	// +kubebuilder:default="immich"
 	// +optional
-	Username string `json:"username,omitempty"`
+	Username *string `json:"username,omitempty"`
 
 	// Reference to a secret containing the password
 	// Required if enabled is false and URLSecretRef is not set
@@ -770,7 +857,7 @@ type IngressSpec struct {
 	// Enable ingress
 	// +kubebuilder:default=false
 	// +optional
-	Enabled bool `json:"enabled,omitempty"`
+	Enabled *bool `json:"enabled,omitempty"`
 
 	// Ingress class name
 	// +optional
@@ -792,7 +879,8 @@ type IngressSpec struct {
 // IngressHost defines a host for the ingress.
 type IngressHost struct {
 	// Host name
-	Host string `json:"host,omitempty"`
+	// +optional
+	Host *string `json:"host,omitempty"`
 
 	// Paths for this host
 	// +optional
@@ -803,20 +891,24 @@ type IngressHost struct {
 type IngressPath struct {
 	// Path
 	// +kubebuilder:default="/"
-	Path string `json:"path,omitempty"`
+	// +optional
+	Path *string `json:"path,omitempty"`
 
 	// Path type
 	// +kubebuilder:default="Prefix"
-	PathType string `json:"pathType,omitempty"`
+	// +optional
+	PathType *string `json:"pathType,omitempty"`
 }
 
 // IngressTLS defines TLS configuration for the ingress.
 type IngressTLS struct {
 	// Hosts covered by the TLS certificate
+	// +optional
 	Hosts []string `json:"hosts,omitempty"`
 
 	// Secret name containing the TLS certificate
-	SecretName string `json:"secretName,omitempty"`
+	// +optional
+	SecretName *string `json:"secretName,omitempty"`
 }
 
 // ImmichStatus defines the observed state of Immich.
@@ -910,8 +1002,8 @@ func (i *Immich) IsValkeyEnabled() bool {
 // Returns empty string if neither is set (caller should handle as error)
 func (i *Immich) GetServerImage() string {
 	// User-specified image takes precedence
-	if i.Spec.Server != nil && i.Spec.Server.Image != "" {
-		return i.Spec.Server.Image
+	if i.Spec.Server != nil && i.Spec.Server.Image != nil && *i.Spec.Server.Image != "" {
+		return *i.Spec.Server.Image
 	}
 
 	// Fall back to environment variable (disconnected/air-gapped support)
@@ -925,8 +1017,8 @@ func (i *Immich) GetServerImage() string {
 // Returns empty string if neither is set (caller should handle as error)
 func (i *Immich) GetMachineLearningImage() string {
 	// User-specified image takes precedence
-	if i.Spec.MachineLearning != nil && i.Spec.MachineLearning.Image != "" {
-		return i.Spec.MachineLearning.Image
+	if i.Spec.MachineLearning != nil && i.Spec.MachineLearning.Image != nil && *i.Spec.MachineLearning.Image != "" {
+		return *i.Spec.MachineLearning.Image
 	}
 
 	// Fall back to environment variable (disconnected/air-gapped support)
@@ -940,8 +1032,8 @@ func (i *Immich) GetMachineLearningImage() string {
 // Returns empty string if neither is set (caller should handle as error)
 func (i *Immich) GetValkeyImage() string {
 	// User-specified image takes precedence
-	if i.Spec.Valkey != nil && i.Spec.Valkey.Image != "" {
-		return i.Spec.Valkey.Image
+	if i.Spec.Valkey != nil && i.Spec.Valkey.Image != nil && *i.Spec.Valkey.Image != "" {
+		return *i.Spec.Valkey.Image
 	}
 
 	// Fall back to environment variable (disconnected/air-gapped support)
@@ -952,8 +1044,8 @@ func (i *Immich) GetValkeyImage() string {
 // Returns the existingClaim if set, otherwise generates a name based on the Immich resource name.
 func (i *Immich) GetLibraryPVCName() string {
 	if i.Spec.Immich != nil && i.Spec.Immich.Persistence != nil && i.Spec.Immich.Persistence.Library != nil {
-		if i.Spec.Immich.Persistence.Library.ExistingClaim != "" {
-			return i.Spec.Immich.Persistence.Library.ExistingClaim
+		if i.Spec.Immich.Persistence.Library.ExistingClaim != nil && *i.Spec.Immich.Persistence.Library.ExistingClaim != "" {
+			return *i.Spec.Immich.Persistence.Library.ExistingClaim
 		}
 	}
 	return i.Name + "-library"
@@ -963,7 +1055,7 @@ func (i *Immich) GetLibraryPVCName() string {
 // This is true when existingClaim is not set (a default size will be used if not specified).
 func (i *Immich) ShouldCreateLibraryPVC() bool {
 	if i.Spec.Immich != nil && i.Spec.Immich.Persistence != nil && i.Spec.Immich.Persistence.Library != nil {
-		return i.Spec.Immich.Persistence.Library.ExistingClaim == ""
+		return i.Spec.Immich.Persistence.Library.ExistingClaim == nil || *i.Spec.Immich.Persistence.Library.ExistingClaim == ""
 	}
 	return true // default to creating a PVC
 }
@@ -972,8 +1064,8 @@ func (i *Immich) ShouldCreateLibraryPVC() bool {
 // Defaults to 10Gi if not specified.
 func (i *Immich) GetLibrarySize() resource.Quantity {
 	if i.Spec.Immich != nil && i.Spec.Immich.Persistence != nil && i.Spec.Immich.Persistence.Library != nil {
-		if !i.Spec.Immich.Persistence.Library.Size.IsZero() {
-			return i.Spec.Immich.Persistence.Library.Size
+		if i.Spec.Immich.Persistence.Library.Size != nil && !i.Spec.Immich.Persistence.Library.Size.IsZero() {
+			return *i.Spec.Immich.Persistence.Library.Size
 		}
 	}
 	return resource.MustParse("10Gi")
@@ -991,11 +1083,11 @@ func (i *Immich) GetLibraryAccessModes() []corev1.PersistentVolumeAccessMode {
 }
 
 // GetLibraryStorageClass returns the storage class for the library PVC.
-func (i *Immich) GetLibraryStorageClass() string {
+func (i *Immich) GetLibraryStorageClass() *string {
 	if i.Spec.Immich != nil && i.Spec.Immich.Persistence != nil && i.Spec.Immich.Persistence.Library != nil {
 		return i.Spec.Immich.Persistence.Library.StorageClass
 	}
-	return ""
+	return nil
 }
 
 // IsPostgresEnabled returns true if the built-in PostgreSQL is enabled
@@ -1012,8 +1104,8 @@ func (i *Immich) IsPostgresEnabled() bool {
 // 2. RELATED_IMAGE_postgres environment variable (for disconnected environments)
 // Returns empty string if neither is set (caller should handle as error)
 func (i *Immich) GetPostgresImage() string {
-	if i.Spec.Postgres != nil && i.Spec.Postgres.Image != "" {
-		return i.Spec.Postgres.Image
+	if i.Spec.Postgres != nil && i.Spec.Postgres.Image != nil && *i.Spec.Postgres.Image != "" {
+		return *i.Spec.Postgres.Image
 	}
 	return os.Getenv(EnvRelatedImagePostgres)
 }
@@ -1028,8 +1120,8 @@ func GetImmichInitContainerImage() string {
 // When using VolumeClaimTemplates, the PVC is named: <volumeClaimTemplate.name>-<statefulset.name>-<ordinal>
 func (i *Immich) GetPostgresPVCName() string {
 	if i.Spec.Postgres != nil && i.Spec.Postgres.Persistence != nil {
-		if i.Spec.Postgres.Persistence.ExistingClaim != "" {
-			return i.Spec.Postgres.Persistence.ExistingClaim
+		if i.Spec.Postgres.Persistence.ExistingClaim != nil && *i.Spec.Postgres.Persistence.ExistingClaim != "" {
+			return *i.Spec.Postgres.Persistence.ExistingClaim
 		}
 	}
 	// VolumeClaimTemplate name is "data", StatefulSet name is "<immich.name>-postgres", ordinal is 0
@@ -1042,32 +1134,32 @@ func (i *Immich) GetPostgresHost() string {
 	if i.IsPostgresEnabled() {
 		return i.Name + "-postgres"
 	}
-	if i.Spec.Postgres != nil {
-		return i.Spec.Postgres.Host
+	if i.Spec.Postgres != nil && i.Spec.Postgres.Host != nil {
+		return *i.Spec.Postgres.Host
 	}
 	return ""
 }
 
 // GetPostgresPort returns the port for PostgreSQL connection.
 func (i *Immich) GetPostgresPort() int32 {
-	if i.Spec.Postgres != nil && i.Spec.Postgres.Port != 0 {
-		return i.Spec.Postgres.Port
+	if i.Spec.Postgres != nil && i.Spec.Postgres.Port != nil && *i.Spec.Postgres.Port != 0 {
+		return *i.Spec.Postgres.Port
 	}
 	return 5432
 }
 
 // GetPostgresDatabase returns the database name.
 func (i *Immich) GetPostgresDatabase() string {
-	if i.Spec.Postgres != nil && i.Spec.Postgres.Database != "" {
-		return i.Spec.Postgres.Database
+	if i.Spec.Postgres != nil && i.Spec.Postgres.Database != nil && *i.Spec.Postgres.Database != "" {
+		return *i.Spec.Postgres.Database
 	}
 	return "immich"
 }
 
 // GetPostgresUsername returns the username for PostgreSQL.
 func (i *Immich) GetPostgresUsername() string {
-	if i.Spec.Postgres != nil && i.Spec.Postgres.Username != "" {
-		return i.Spec.Postgres.Username
+	if i.Spec.Postgres != nil && i.Spec.Postgres.Username != nil && *i.Spec.Postgres.Username != "" {
+		return *i.Spec.Postgres.Username
 	}
 	return "immich"
 }
@@ -1078,16 +1170,16 @@ func (i *Immich) GetValkeyHost() string {
 	if i.IsValkeyEnabled() {
 		return i.Name + "-valkey"
 	}
-	if i.Spec.Valkey != nil {
-		return i.Spec.Valkey.Host
+	if i.Spec.Valkey != nil && i.Spec.Valkey.Host != nil {
+		return *i.Spec.Valkey.Host
 	}
 	return ""
 }
 
 // GetValkeyPort returns the port for Valkey/Redis connection.
 func (i *Immich) GetValkeyPort() int32 {
-	if i.Spec.Valkey != nil && i.Spec.Valkey.Port != 0 {
-		return i.Spec.Valkey.Port
+	if i.Spec.Valkey != nil && i.Spec.Valkey.Port != nil && *i.Spec.Valkey.Port != 0 {
+		return *i.Spec.Valkey.Port
 	}
 	return 6379
 }
@@ -1098,8 +1190,206 @@ func (i *Immich) GetMachineLearningURL() string {
 	if i.IsMachineLearningEnabled() {
 		return "http://" + i.Name + "-machine-learning:3003"
 	}
-	if i.Spec.MachineLearning != nil {
-		return i.Spec.MachineLearning.URL
+	if i.Spec.MachineLearning != nil && i.Spec.MachineLearning.URL != nil {
+		return *i.Spec.MachineLearning.URL
 	}
 	return ""
+}
+
+// IsIngressEnabled returns true if ingress is enabled for the server
+func (i *Immich) IsIngressEnabled() bool {
+	if i.Spec.Server == nil || i.Spec.Server.Ingress == nil || i.Spec.Server.Ingress.Enabled == nil {
+		return false // default to disabled
+	}
+	return *i.Spec.Server.Ingress.Enabled
+}
+
+// IsMetricsEnabled returns true if metrics are enabled
+func (i *Immich) IsMetricsEnabled() bool {
+	if i.Spec.Immich == nil || i.Spec.Immich.Metrics == nil || i.Spec.Immich.Metrics.Enabled == nil {
+		return false // default to disabled
+	}
+	return *i.Spec.Immich.Metrics.Enabled
+}
+
+// GetConfigurationKind returns the kind of resource to store configuration in
+func (i *Immich) GetConfigurationKind() string {
+	if i.Spec.Immich != nil && i.Spec.Immich.ConfigurationKind != nil && *i.Spec.Immich.ConfigurationKind != "" {
+		return *i.Spec.Immich.ConfigurationKind
+	}
+	return "ConfigMap"
+}
+
+// GetServerReplicas returns the number of server replicas
+func (i *Immich) GetServerReplicas() int32 {
+	if i.Spec.Server != nil && i.Spec.Server.Replicas != nil {
+		return *i.Spec.Server.Replicas
+	}
+	return 1
+}
+
+// GetMachineLearningReplicas returns the number of ML replicas
+func (i *Immich) GetMachineLearningReplicas() int32 {
+	if i.Spec.MachineLearning != nil && i.Spec.MachineLearning.Replicas != nil {
+		return *i.Spec.MachineLearning.Replicas
+	}
+	return 1
+}
+
+// IsMLPersistenceEnabled returns true if ML cache persistence is enabled
+func (i *Immich) IsMLPersistenceEnabled() bool {
+	if i.Spec.MachineLearning == nil || i.Spec.MachineLearning.Persistence == nil || i.Spec.MachineLearning.Persistence.Enabled == nil {
+		return true // default to enabled
+	}
+	return *i.Spec.MachineLearning.Persistence.Enabled
+}
+
+// GetMLCachePVCName returns the name of the ML cache PVC
+func (i *Immich) GetMLCachePVCName() string {
+	if i.Spec.MachineLearning != nil && i.Spec.MachineLearning.Persistence != nil {
+		if i.Spec.MachineLearning.Persistence.ExistingClaim != nil && *i.Spec.MachineLearning.Persistence.ExistingClaim != "" {
+			return *i.Spec.MachineLearning.Persistence.ExistingClaim
+		}
+	}
+	return i.Name + "-ml-cache"
+}
+
+// GetMLCacheSize returns the size for the ML cache PVC
+func (i *Immich) GetMLCacheSize() resource.Quantity {
+	if i.Spec.MachineLearning != nil && i.Spec.MachineLearning.Persistence != nil {
+		if i.Spec.MachineLearning.Persistence.Size != nil && !i.Spec.MachineLearning.Persistence.Size.IsZero() {
+			return *i.Spec.MachineLearning.Persistence.Size
+		}
+	}
+	return resource.MustParse("10Gi")
+}
+
+// GetMLCacheAccessModes returns the access modes for the ML cache PVC
+func (i *Immich) GetMLCacheAccessModes() []corev1.PersistentVolumeAccessMode {
+	if i.Spec.MachineLearning != nil && i.Spec.MachineLearning.Persistence != nil {
+		if len(i.Spec.MachineLearning.Persistence.AccessModes) > 0 {
+			return i.Spec.MachineLearning.Persistence.AccessModes
+		}
+	}
+	return []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
+}
+
+// GetMLCacheStorageClass returns the storage class for the ML cache PVC
+func (i *Immich) GetMLCacheStorageClass() *string {
+	if i.Spec.MachineLearning != nil && i.Spec.MachineLearning.Persistence != nil {
+		return i.Spec.MachineLearning.Persistence.StorageClass
+	}
+	return nil
+}
+
+// GetPostgresSize returns the size for the PostgreSQL PVC
+func (i *Immich) GetPostgresSize() resource.Quantity {
+	if i.Spec.Postgres != nil && i.Spec.Postgres.Persistence != nil {
+		if i.Spec.Postgres.Persistence.Size != nil && !i.Spec.Postgres.Persistence.Size.IsZero() {
+			return *i.Spec.Postgres.Persistence.Size
+		}
+	}
+	return resource.MustParse("10Gi")
+}
+
+// GetPostgresAccessModes returns the access modes for the PostgreSQL PVC
+func (i *Immich) GetPostgresAccessModes() []corev1.PersistentVolumeAccessMode {
+	if i.Spec.Postgres != nil && i.Spec.Postgres.Persistence != nil {
+		if len(i.Spec.Postgres.Persistence.AccessModes) > 0 {
+			return i.Spec.Postgres.Persistence.AccessModes
+		}
+	}
+	return []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
+}
+
+// GetPostgresStorageClass returns the storage class for the PostgreSQL PVC
+func (i *Immich) GetPostgresStorageClass() *string {
+	if i.Spec.Postgres != nil && i.Spec.Postgres.Persistence != nil {
+		return i.Spec.Postgres.Persistence.StorageClass
+	}
+	return nil
+}
+
+// IsValkeyPersistenceEnabled returns true if Valkey persistence is enabled
+func (i *Immich) IsValkeyPersistenceEnabled() bool {
+	if i.Spec.Valkey == nil || i.Spec.Valkey.Persistence == nil || i.Spec.Valkey.Persistence.Enabled == nil {
+		return false // default to disabled
+	}
+	return *i.Spec.Valkey.Persistence.Enabled
+}
+
+// GetValkeyPVCName returns the name of the Valkey PVC
+func (i *Immich) GetValkeyPVCName() string {
+	if i.Spec.Valkey != nil && i.Spec.Valkey.Persistence != nil {
+		if i.Spec.Valkey.Persistence.ExistingClaim != nil && *i.Spec.Valkey.Persistence.ExistingClaim != "" {
+			return *i.Spec.Valkey.Persistence.ExistingClaim
+		}
+	}
+	return i.Name + "-valkey-data"
+}
+
+// GetValkeySize returns the size for the Valkey PVC
+func (i *Immich) GetValkeySize() resource.Quantity {
+	if i.Spec.Valkey != nil && i.Spec.Valkey.Persistence != nil {
+		if i.Spec.Valkey.Persistence.Size != nil && !i.Spec.Valkey.Persistence.Size.IsZero() {
+			return *i.Spec.Valkey.Persistence.Size
+		}
+	}
+	return resource.MustParse("10Gi")
+}
+
+// GetValkeyAccessModes returns the access modes for the Valkey PVC
+func (i *Immich) GetValkeyAccessModes() []corev1.PersistentVolumeAccessMode {
+	if i.Spec.Valkey != nil && i.Spec.Valkey.Persistence != nil {
+		if len(i.Spec.Valkey.Persistence.AccessModes) > 0 {
+			return i.Spec.Valkey.Persistence.AccessModes
+		}
+	}
+	return []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
+}
+
+// GetValkeyStorageClass returns the storage class for the Valkey PVC
+func (i *Immich) GetValkeyStorageClass() *string {
+	if i.Spec.Valkey != nil && i.Spec.Valkey.Persistence != nil {
+		return i.Spec.Valkey.Persistence.StorageClass
+	}
+	return nil
+}
+
+// GetValkeyDbIndex returns the database index for Valkey
+func (i *Immich) GetValkeyDbIndex() int32 {
+	if i.Spec.Valkey != nil && i.Spec.Valkey.DbIndex != nil {
+		return *i.Spec.Valkey.DbIndex
+	}
+	return 0
+}
+
+// ShouldCreateMLCachePVC returns true if the operator should create a PVC for ML cache
+func (i *Immich) ShouldCreateMLCachePVC() bool {
+	if !i.IsMLPersistenceEnabled() {
+		return false
+	}
+	if i.Spec.MachineLearning != nil && i.Spec.MachineLearning.Persistence != nil {
+		return i.Spec.MachineLearning.Persistence.ExistingClaim == nil || *i.Spec.MachineLearning.Persistence.ExistingClaim == ""
+	}
+	return true
+}
+
+// ShouldCreateValkeyPVC returns true if the operator should create a PVC for Valkey
+func (i *Immich) ShouldCreateValkeyPVC() bool {
+	if !i.IsValkeyPersistenceEnabled() {
+		return false
+	}
+	if i.Spec.Valkey != nil && i.Spec.Valkey.Persistence != nil {
+		return i.Spec.Valkey.Persistence.ExistingClaim == nil || *i.Spec.Valkey.Persistence.ExistingClaim == ""
+	}
+	return true
+}
+
+// ShouldCreatePostgresPVC returns true if the operator should create a PVC for PostgreSQL
+func (i *Immich) ShouldCreatePostgresPVC() bool {
+	if i.Spec.Postgres != nil && i.Spec.Postgres.Persistence != nil {
+		return i.Spec.Postgres.Persistence.ExistingClaim == nil || *i.Spec.Postgres.Persistence.ExistingClaim == ""
+	}
+	return true
 }

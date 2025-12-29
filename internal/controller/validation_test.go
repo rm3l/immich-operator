@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	mediav1alpha1 "github.com/rm3l/immich-operator/api/v1alpha1"
 )
@@ -60,7 +61,7 @@ func TestValidateImages(t *testing.T) {
 				},
 				Spec: mediav1alpha1.ImmichSpec{
 					Postgres: &mediav1alpha1.PostgresSpec{
-						Enabled: boolPtr(false),
+						Enabled: ptr.To(false),
 					},
 				},
 			},
@@ -76,8 +77,8 @@ func TestValidateImages(t *testing.T) {
 				},
 				Spec: mediav1alpha1.ImmichSpec{
 					Postgres: &mediav1alpha1.PostgresSpec{
-						Enabled: boolPtr(false),
-						Host:    "external-postgres.example.com",
+						Enabled: ptr.To(false),
+						Host:    ptr.To("external-postgres.example.com"),
 					},
 				},
 			},
@@ -93,8 +94,8 @@ func TestValidateImages(t *testing.T) {
 				},
 				Spec: mediav1alpha1.ImmichSpec{
 					Postgres: &mediav1alpha1.PostgresSpec{
-						Enabled: boolPtr(false),
-						Host:    "external-postgres.example.com",
+						Enabled: ptr.To(false),
+						Host:    ptr.To("external-postgres.example.com"),
 						PasswordSecretRef: &mediav1alpha1.SecretKeySelector{
 							Name: "postgres-secret",
 							Key:  "password",
@@ -113,7 +114,7 @@ func TestValidateImages(t *testing.T) {
 				},
 				Spec: mediav1alpha1.ImmichSpec{
 					Valkey: &mediav1alpha1.ValkeySpec{
-						Enabled: boolPtr(false),
+						Enabled: ptr.To(false),
 					},
 				},
 			},
@@ -129,8 +130,8 @@ func TestValidateImages(t *testing.T) {
 				},
 				Spec: mediav1alpha1.ImmichSpec{
 					Valkey: &mediav1alpha1.ValkeySpec{
-						Enabled: boolPtr(false),
-						Host:    "external-redis.example.com",
+						Enabled: ptr.To(false),
+						Host:    ptr.To("external-redis.example.com"),
 					},
 				},
 			},
@@ -145,7 +146,7 @@ func TestValidateImages(t *testing.T) {
 				},
 				Spec: mediav1alpha1.ImmichSpec{
 					MachineLearning: &mediav1alpha1.MachineLearningSpec{
-						Enabled: boolPtr(false),
+						Enabled: ptr.To(false),
 					},
 				},
 			},
@@ -160,8 +161,8 @@ func TestValidateImages(t *testing.T) {
 				},
 				Spec: mediav1alpha1.ImmichSpec{
 					MachineLearning: &mediav1alpha1.MachineLearningSpec{
-						Enabled: boolPtr(false),
-						URL:     "http://external-ml.example.com:3003",
+						Enabled: ptr.To(false),
+						URL:     ptr.To("http://external-ml.example.com:3003"),
 					},
 				},
 			},
@@ -229,16 +230,16 @@ func TestValidateImages_WithSpecImages(t *testing.T) {
 		},
 		Spec: mediav1alpha1.ImmichSpec{
 			Server: &mediav1alpha1.ServerSpec{
-				Image: "ghcr.io/immich-app/immich-server:v1.0.0",
+				Image: ptr.To("ghcr.io/immich-app/immich-server:v1.0.0"),
 			},
 			MachineLearning: &mediav1alpha1.MachineLearningSpec{
-				Image: "ghcr.io/immich-app/immich-machine-learning:v1.0.0",
+				Image: ptr.To("ghcr.io/immich-app/immich-machine-learning:v1.0.0"),
 			},
 			Valkey: &mediav1alpha1.ValkeySpec{
-				Image: "docker.io/valkey/valkey:9-alpine",
+				Image: ptr.To("docker.io/valkey/valkey:9-alpine"),
 			},
 			Postgres: &mediav1alpha1.PostgresSpec{
-				Image: "docker.io/tensorchord/pgvecto-rs:pg17-v0.4.0",
+				Image: ptr.To("docker.io/tensorchord/pgvecto-rs:pg17-v0.4.0"),
 			},
 		},
 	}
@@ -247,9 +248,4 @@ func TestValidateImages_WithSpecImages(t *testing.T) {
 	if err != nil {
 		t.Errorf("validateImages() unexpected error = %v", err)
 	}
-}
-
-// boolPtr returns a pointer to a bool
-func boolPtr(b bool) *bool {
-	return &b
 }

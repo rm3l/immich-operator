@@ -46,7 +46,7 @@ func (r *ImmichReconciler) validateImages(immich *mediav1alpha1.Immich) error {
 	// Validate external PostgreSQL config when built-in is disabled
 	if !immich.IsPostgresEnabled() {
 		postgres := immich.Spec.Postgres
-		if postgres == nil || postgres.Host == "" {
+		if postgres == nil || postgres.Host == nil || *postgres.Host == "" {
 			configErrors = append(configErrors, "spec.postgres.host is required when spec.postgres.enabled=false")
 		}
 		if postgres == nil || (postgres.PasswordSecretRef == nil && postgres.URLSecretRef == nil) {
@@ -58,7 +58,7 @@ func (r *ImmichReconciler) validateImages(immich *mediav1alpha1.Immich) error {
 	// Validate external Valkey config when built-in is disabled
 	if !immich.IsValkeyEnabled() {
 		valkey := immich.Spec.Valkey
-		if valkey == nil || valkey.Host == "" {
+		if valkey == nil || valkey.Host == nil || *valkey.Host == "" {
 			configErrors = append(configErrors, "spec.valkey.host is required when spec.valkey.enabled=false")
 		}
 	}

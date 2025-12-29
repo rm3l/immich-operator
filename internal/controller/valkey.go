@@ -177,8 +177,8 @@ func (r *ImmichReconciler) getValkeyVolumes(immich *mediav1alpha1.Immich) []core
 
 	if persistence.Enabled != nil && *persistence.Enabled {
 		pvcName := fmt.Sprintf("%s-valkey-data", immich.Name)
-		if persistence.ExistingClaim != "" {
-			pvcName = persistence.ExistingClaim
+		if persistence.ExistingClaim != nil && *persistence.ExistingClaim != "" {
+			pvcName = *persistence.ExistingClaim
 		}
 		return []corev1.Volume{
 			{
@@ -248,7 +248,7 @@ func (r *ImmichReconciler) reconcileValkeyPVC(ctx context.Context, immich *media
 	valkeySpec := ptr.Deref(immich.Spec.Valkey, mediav1alpha1.ValkeySpec{})
 	persistence := ptr.Deref(valkeySpec.Persistence, mediav1alpha1.ValkeyPersistenceSpec{})
 
-	if persistence.ExistingClaim != "" {
+	if persistence.ExistingClaim != nil && *persistence.ExistingClaim != "" {
 		return nil // Using existing PVC
 	}
 
@@ -266,9 +266,9 @@ func (r *ImmichReconciler) reconcileValkeyPVC(ctx context.Context, immich *media
 		return err
 	}
 
-	size := persistence.Size
-	if size.IsZero() {
-		size = resource.MustParse("10Gi")
+	size := resource.MustParse("10Gi")
+	if persistence.Size != nil && !persistence.Size.IsZero() {
+		size = *persistence.Size
 	}
 
 	accessModes := persistence.AccessModes

@@ -209,8 +209,8 @@ func (r *ImmichReconciler) getMLVolumes(immich *mediav1alpha1.Immich) []corev1.V
 
 	// Persistence is enabled (default)
 	pvcName := fmt.Sprintf("%s-ml-cache", immich.Name)
-	if persistence.ExistingClaim != "" {
-		pvcName = persistence.ExistingClaim
+	if persistence.ExistingClaim != nil && *persistence.ExistingClaim != "" {
+		pvcName = *persistence.ExistingClaim
 	}
 
 	return []corev1.Volume{
@@ -272,7 +272,7 @@ func (r *ImmichReconciler) reconcileMLPVC(ctx context.Context, immich *mediav1al
 	mlSpec := ptr.Deref(immich.Spec.MachineLearning, mediav1alpha1.MachineLearningSpec{})
 	persistence := ptr.Deref(mlSpec.Persistence, mediav1alpha1.MachineLearningPersistenceSpec{})
 
-	if persistence.ExistingClaim != "" {
+	if persistence.ExistingClaim != nil && *persistence.ExistingClaim != "" {
 		return nil // Using existing PVC
 	}
 
@@ -290,9 +290,9 @@ func (r *ImmichReconciler) reconcileMLPVC(ctx context.Context, immich *mediav1al
 		return err
 	}
 
-	size := persistence.Size
-	if size.IsZero() {
-		size = resource.MustParse("10Gi")
+	size := resource.MustParse("10Gi")
+	if persistence.Size != nil && !persistence.Size.IsZero() {
+		size = *persistence.Size
 	}
 
 	accessModes := persistence.AccessModes
