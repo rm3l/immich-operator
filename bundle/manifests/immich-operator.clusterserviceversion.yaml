@@ -15,6 +15,18 @@ metadata:
           "apiVersion": "media.rm3l.org/v1alpha1",
           "kind": "Immich",
           "metadata": {
+            "name": "immich-no-ml"
+          },
+          "spec": {
+            "machineLearning": {
+              "enabled": false
+            }
+          }
+        },
+        {
+          "apiVersion": "media.rm3l.org/v1alpha1",
+          "kind": "Immich",
+          "metadata": {
             "labels": {
               "app.kubernetes.io/managed-by": "kustomize",
               "app.kubernetes.io/name": "immich-operator"
@@ -125,7 +137,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-12-29T10:58:52Z"
+    createdAt: "2025-12-29T10:59:36Z"
     operators.operatorframework.io/builder: operator-sdk-v1.42.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: immich-operator.v0.0.1

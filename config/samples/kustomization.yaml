@@ -2,4 +2,5 @@
 resources:
 - media_v1alpha1_immich.yaml
 - media_v1alpha1_immich_minimal.yaml
+- media_v1alpha1_immich_no_ml.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples
