@@ -43,13 +43,6 @@ const (
 	ConditionTypeReady       = "Ready"
 	ConditionTypeProgressing = "Progressing"
 	ConditionTypeDegraded    = "Degraded"
-
-	// Labels
-	labelApp       = "app.kubernetes.io/name"
-	labelInstance  = "app.kubernetes.io/instance"
-	labelComponent = "app.kubernetes.io/component"
-	labelManagedBy = "app.kubernetes.io/managed-by"
-	labelPartOf    = "app.kubernetes.io/part-of"
 )
 
 // ImmichReconciler reconciles a Immich object
