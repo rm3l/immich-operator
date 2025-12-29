@@ -14,20 +14,19 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-and-push:
+  # Prepare: Extract version and determine tags
+  prepare:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      short_sha: ${{ steps.commit.outputs.short_sha }}
+      operator_base_tag: ${{ steps.tags.outputs.operator_base_tag }}
+      bundle_base_tag: ${{ steps.tags.outputs.bundle_base_tag }}
+      operator_tags: ${{ steps.tags.outputs.operator_tags }}
+      bundle_tags: ${{ steps.tags.outputs.bundle_tags }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
 
       - name: Extract VERSION from Makefile
         id: version
@@ -47,22 +46,46 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" == "pull_request" ]; then
             PR_NUMBER=${{ github.event.pull_request.number }}
-            # PR tags: pr-<number> and pr-<number>-<commit>
-            OPERATOR_TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-${PR_NUMBER},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-${PR_NUMBER}-${{ steps.commit.outputs.short_sha }}"
-            BUNDLE_TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle:pr-${PR_NUMBER},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle:pr-${PR_NUMBER}-${{ steps.commit.outputs.short_sha }}"
+            # Base tag for arch-specific images
+            OPERATOR_BASE_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-${PR_NUMBER}"
+            BUNDLE_BASE_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle:pr-${PR_NUMBER}"
+            # Final multi-arch tags
+            OPERATOR_TAGS="${OPERATOR_BASE_TAG},${OPERATOR_BASE_TAG}-${{ steps.commit.outputs.short_sha }}"
+            BUNDLE_TAGS="${BUNDLE_BASE_TAG},${BUNDLE_BASE_TAG}-${{ steps.commit.outputs.short_sha }}"
           else
             VERSION="${{ steps.version.outputs.version }}"
-            # Main branch tags: <version> and <version>-<commit>
-            OPERATOR_TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-${{ steps.commit.outputs.short_sha }},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-            BUNDLE_TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle:${VERSION},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle:${VERSION}-${{ steps.commit.outputs.short_sha }},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle:latest"
+            # Base tag for arch-specific images
+            OPERATOR_BASE_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}"
+            BUNDLE_BASE_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle:${VERSION}"
+            # Final multi-arch tags
+            OPERATOR_TAGS="${OPERATOR_BASE_TAG},${OPERATOR_BASE_TAG}-${{ steps.commit.outputs.short_sha }},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+            BUNDLE_TAGS="${BUNDLE_BASE_TAG},${BUNDLE_BASE_TAG}-${{ steps.commit.outputs.short_sha }},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-bundle:latest"
           fi
+          echo "operator_base_tag=${OPERATOR_BASE_TAG}" >> $GITHUB_OUTPUT
+          echo "bundle_base_tag=${BUNDLE_BASE_TAG}" >> $GITHUB_OUTPUT
           echo "operator_tags=${OPERATOR_TAGS}" >> $GITHUB_OUTPUT
           echo "bundle_tags=${BUNDLE_TAGS}" >> $GITHUB_OUTPUT
-          echo "Operator tags: ${OPERATOR_TAGS}"
-          echo "Bundle tags: ${BUNDLE_TAGS}"
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+  # Build operator image on native runners (parallel)
+  build-operator:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            platform: linux/amd64
+            suffix: amd64
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            suffix: arm64
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -74,43 +97,136 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push operator image
+      - name: Build and push operator image (${{ matrix.suffix }})
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ matrix.platform }}
           push: true
-          tags: ${{ steps.tags.outputs.operator_tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ needs.prepare.outputs.operator_base_tag }}-${{ matrix.suffix }}
+          cache-from: type=gha,scope=operator-${{ matrix.suffix }}
+          cache-to: type=gha,mode=max,scope=operator-${{ matrix.suffix }}
+          provenance: false
+
+  # Build bundle image on native runners (parallel)
+  build-bundle:
+    needs: [prepare, build-operator]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            platform: linux/amd64
+            suffix: amd64
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            suffix: arm64
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
 
       - name: Generate bundle manifests
         run: |
-          # Set the operator image for bundle generation
-          FIRST_TAG=$(echo "${{ steps.tags.outputs.operator_tags }}" | cut -d',' -f1)
-          make bundle IMG="${FIRST_TAG}"
+          # Use the base operator tag for bundle generation
+          make bundle IMG="${{ needs.prepare.outputs.operator_base_tag }}"
 
-      - name: Build and push bundle image
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push bundle image (${{ matrix.suffix }})
         uses: docker/build-push-action@v6
         with:
           context: .
           file: bundle.Dockerfile
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ matrix.platform }}
           push: true
-          tags: ${{ steps.tags.outputs.bundle_tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ needs.prepare.outputs.bundle_base_tag }}-${{ matrix.suffix }}
+          cache-from: type=gha,scope=bundle-${{ matrix.suffix }}
+          cache-to: type=gha,mode=max,scope=bundle-${{ matrix.suffix }}
+          provenance: false
+
+  # Merge architecture-specific images into multi-arch manifests
+  merge-manifests:
+    needs: [prepare, build-operator, build-bundle]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create multi-arch operator manifest
+        run: |
+          OPERATOR_BASE="${{ needs.prepare.outputs.operator_base_tag }}"
+          OPERATOR_TAGS="${{ needs.prepare.outputs.operator_tags }}"
+          
+          # Create manifest from arch-specific images
+          for TAG in $(echo "${OPERATOR_TAGS}" | tr ',' ' '); do
+            echo "Creating manifest for ${TAG}"
+            docker buildx imagetools create -t "${TAG}" \
+              "${OPERATOR_BASE}-amd64" \
+              "${OPERATOR_BASE}-arm64"
+          done
+
+      - name: Create multi-arch bundle manifest
+        run: |
+          BUNDLE_BASE="${{ needs.prepare.outputs.bundle_base_tag }}"
+          BUNDLE_TAGS="${{ needs.prepare.outputs.bundle_tags }}"
+          
+          # Create manifest from arch-specific images
+          for TAG in $(echo "${BUNDLE_TAGS}" | tr ',' ' '); do
+            echo "Creating manifest for ${TAG}"
+            docker buildx imagetools create -t "${TAG}" \
+              "${BUNDLE_BASE}-amd64" \
+              "${BUNDLE_BASE}-arm64"
+          done
+
+      - name: Verify multi-arch manifests
+        run: |
+          OPERATOR_BASE="${{ needs.prepare.outputs.operator_base_tag }}"
+          BUNDLE_BASE="${{ needs.prepare.outputs.bundle_base_tag }}"
+          
+          echo "Verifying operator manifest:"
+          docker buildx imagetools inspect "${OPERATOR_BASE}"
+          
+          echo ""
+          echo "Verifying bundle manifest:"
+          docker buildx imagetools inspect "${BUNDLE_BASE}"
 
       - name: Summary
         run: |
           echo "## Image Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Operator Image" >> $GITHUB_STEP_SUMMARY
+          echo "### Operator Image (multi-arch: amd64, arm64)" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.tags.outputs.operator_tags }}" | tr ',' '\n' >> $GITHUB_STEP_SUMMARY
+          echo "${{ needs.prepare.outputs.operator_tags }}" | tr ',' '\n' >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Bundle Image" >> $GITHUB_STEP_SUMMARY
+          echo "### Bundle Image (multi-arch: amd64, arm64)" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.tags.outputs.bundle_tags }}" | tr ',' '\n' >> $GITHUB_STEP_SUMMARY
+          echo "${{ needs.prepare.outputs.bundle_tags }}" | tr ',' '\n' >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
