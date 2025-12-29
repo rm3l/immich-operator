@@ -27,10 +27,11 @@ import (
 // Environment variable names for disconnected/air-gapped environments
 // These follow the RELATED_IMAGE_* pattern used by OpenShift OLM
 const (
-	EnvRelatedImageImmich          = "RELATED_IMAGE_immich"
-	EnvRelatedImageMachineLearning = "RELATED_IMAGE_machineLearning"
-	EnvRelatedImageValkey          = "RELATED_IMAGE_valkey"
-	EnvRelatedImagePostgres        = "RELATED_IMAGE_postgres"
+	EnvRelatedImageImmich              = "RELATED_IMAGE_immich"
+	EnvRelatedImageMachineLearning     = "RELATED_IMAGE_machineLearning"
+	EnvRelatedImageValkey              = "RELATED_IMAGE_valkey"
+	EnvRelatedImagePostgres            = "RELATED_IMAGE_postgres"
+	EnvRelatedImageImmichInitContainer = "RELATED_IMAGE_immich_initContainer"
 )
 
 // ImmichSpec defines the desired state of Immich.
@@ -986,6 +987,12 @@ func (i *Immich) GetPostgresImage() string {
 		return i.Spec.Postgres.Image
 	}
 	return os.Getenv(EnvRelatedImagePostgres)
+}
+
+// GetImmichInitContainerImage returns the image to use for Immich init containers.
+// Falls back to RELATED_IMAGE_immich_initContainer environment variable.
+func GetImmichInitContainerImage() string {
+	return os.Getenv(EnvRelatedImageImmichInitContainer)
 }
 
 // GetPostgresPVCName returns the name of the PVC for PostgreSQL data.

@@ -1491,6 +1491,12 @@ func (r *ImmichReconciler) getServerEnv(immich *mediav1alpha1.Immich) []corev1.E
 func (r *ImmichReconciler) getServerInitContainers(immich *mediav1alpha1.Immich) []corev1.Container {
 	initContainers := []corev1.Container{}
 
+	// Get init container image from environment variable
+	initImage := mediav1alpha1.GetImmichInitContainerImage()
+	if initImage == "" {
+		return initContainers // Skip init containers if no image is configured
+	}
+
 	// Wait for PostgreSQL
 	postgresHost := fmt.Sprintf("%s-postgres", immich.Name)
 	postgresPort := int32(5432)
@@ -1503,7 +1509,7 @@ func (r *ImmichReconciler) getServerInitContainers(immich *mediav1alpha1.Immich)
 
 	initContainers = append(initContainers, corev1.Container{
 		Name:  "wait-for-postgres",
-		Image: "busybox:1.36",
+		Image: initImage,
 		Command: []string{
 			"sh", "-c",
 			fmt.Sprintf(`echo "Waiting for PostgreSQL at %s:%d..."
@@ -1528,7 +1534,7 @@ echo "PostgreSQL is up"`, postgresHost, postgresPort, postgresHost, postgresPort
 
 		initContainers = append(initContainers, corev1.Container{
 			Name:  "wait-for-valkey",
-			Image: "busybox:1.36",
+			Image: initImage,
 			Command: []string{
 				"sh", "-c",
 				fmt.Sprintf(`echo "Waiting for Valkey at %s:%d..."

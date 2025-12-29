@@ -165,12 +165,14 @@ RELATED_IMAGE_immich ?= ghcr.io/immich-app/immich-server:v2.4.1
 RELATED_IMAGE_machineLearning ?= ghcr.io/immich-app/immich-machine-learning:v2.4.1
 RELATED_IMAGE_valkey ?= docker.io/valkey/valkey:9-alpine
 RELATED_IMAGE_postgres ?= ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
+RELATED_IMAGE_immich_initContainer ?= docker.io/library/busybox:1.37
 
 run: manifests generate fmt vet ## Run a controller from your host. Use ARGS to pass flags (e.g., make run ARGS="--zap-devel")
 	RELATED_IMAGE_immich=$(RELATED_IMAGE_immich) \
 	RELATED_IMAGE_machineLearning=$(RELATED_IMAGE_machineLearning) \
 	RELATED_IMAGE_valkey=$(RELATED_IMAGE_valkey) \
 	RELATED_IMAGE_postgres=$(RELATED_IMAGE_postgres) \
+	RELATED_IMAGE_immich_initContainer=$(RELATED_IMAGE_immich_initContainer) \
 	go run ./cmd/main.go $(ARGS)
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
