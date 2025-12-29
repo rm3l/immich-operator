@@ -17,7 +17,6 @@ limitations under the License.
 package controller
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -27,17 +26,11 @@ import (
 )
 
 func TestValidateImages(t *testing.T) {
-	// Set up environment variables for image defaults
-	os.Setenv(mediav1alpha1.EnvRelatedImageImmich, "ghcr.io/immich-app/immich-server:latest")
-	os.Setenv(mediav1alpha1.EnvRelatedImageMachineLearning, "ghcr.io/immich-app/immich-machine-learning:latest")
-	os.Setenv(mediav1alpha1.EnvRelatedImageValkey, "docker.io/valkey/valkey:9-alpine")
-	os.Setenv(mediav1alpha1.EnvRelatedImagePostgres, "docker.io/tensorchord/pgvecto-rs:pg17-v0.4.0")
-	defer func() {
-		os.Unsetenv(mediav1alpha1.EnvRelatedImageImmich)
-		os.Unsetenv(mediav1alpha1.EnvRelatedImageMachineLearning)
-		os.Unsetenv(mediav1alpha1.EnvRelatedImageValkey)
-		os.Unsetenv(mediav1alpha1.EnvRelatedImagePostgres)
-	}()
+	// Set up environment variables for image defaults (t.Setenv automatically cleans up)
+	t.Setenv(mediav1alpha1.EnvRelatedImageImmich, "ghcr.io/immich-app/immich-server:latest")
+	t.Setenv(mediav1alpha1.EnvRelatedImageMachineLearning, "ghcr.io/immich-app/immich-machine-learning:latest")
+	t.Setenv(mediav1alpha1.EnvRelatedImageValkey, "docker.io/valkey/valkey:9-alpine")
+	t.Setenv(mediav1alpha1.EnvRelatedImagePostgres, "docker.io/tensorchord/pgvecto-rs:pg17-v0.4.0")
 
 	r := &ImmichReconciler{}
 
@@ -66,7 +59,7 @@ func TestValidateImages(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: mediav1alpha1.ImmichSpec{
-					Postgres: mediav1alpha1.PostgresSpec{
+					Postgres: &mediav1alpha1.PostgresSpec{
 						Enabled: boolPtr(false),
 					},
 				},
@@ -82,7 +75,7 @@ func TestValidateImages(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: mediav1alpha1.ImmichSpec{
-					Postgres: mediav1alpha1.PostgresSpec{
+					Postgres: &mediav1alpha1.PostgresSpec{
 						Enabled: boolPtr(false),
 						Host:    "external-postgres.example.com",
 					},
@@ -99,7 +92,7 @@ func TestValidateImages(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: mediav1alpha1.ImmichSpec{
-					Postgres: mediav1alpha1.PostgresSpec{
+					Postgres: &mediav1alpha1.PostgresSpec{
 						Enabled: boolPtr(false),
 						Host:    "external-postgres.example.com",
 						PasswordSecretRef: &mediav1alpha1.SecretKeySelector{
@@ -119,7 +112,7 @@ func TestValidateImages(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: mediav1alpha1.ImmichSpec{
-					Valkey: mediav1alpha1.ValkeySpec{
+					Valkey: &mediav1alpha1.ValkeySpec{
 						Enabled: boolPtr(false),
 					},
 				},
@@ -135,7 +128,7 @@ func TestValidateImages(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: mediav1alpha1.ImmichSpec{
-					Valkey: mediav1alpha1.ValkeySpec{
+					Valkey: &mediav1alpha1.ValkeySpec{
 						Enabled: boolPtr(false),
 						Host:    "external-redis.example.com",
 					},
@@ -151,7 +144,7 @@ func TestValidateImages(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: mediav1alpha1.ImmichSpec{
-					MachineLearning: mediav1alpha1.MachineLearningSpec{
+					MachineLearning: &mediav1alpha1.MachineLearningSpec{
 						Enabled: boolPtr(false),
 					},
 				},
@@ -166,7 +159,7 @@ func TestValidateImages(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: mediav1alpha1.ImmichSpec{
-					MachineLearning: mediav1alpha1.MachineLearningSpec{
+					MachineLearning: &mediav1alpha1.MachineLearningSpec{
 						Enabled: boolPtr(false),
 						URL:     "http://external-ml.example.com:3003",
 					},
@@ -195,11 +188,11 @@ func TestValidateImages(t *testing.T) {
 }
 
 func TestValidateImages_MissingEnvVars(t *testing.T) {
-	// Clear all RELATED_IMAGE env vars
-	os.Unsetenv(mediav1alpha1.EnvRelatedImageImmich)
-	os.Unsetenv(mediav1alpha1.EnvRelatedImageMachineLearning)
-	os.Unsetenv(mediav1alpha1.EnvRelatedImageValkey)
-	os.Unsetenv(mediav1alpha1.EnvRelatedImagePostgres)
+	// Clear all RELATED_IMAGE env vars (t.Setenv to empty string and automatic cleanup)
+	t.Setenv(mediav1alpha1.EnvRelatedImageImmich, "")
+	t.Setenv(mediav1alpha1.EnvRelatedImageMachineLearning, "")
+	t.Setenv(mediav1alpha1.EnvRelatedImageValkey, "")
+	t.Setenv(mediav1alpha1.EnvRelatedImagePostgres, "")
 
 	r := &ImmichReconciler{}
 
@@ -221,11 +214,11 @@ func TestValidateImages_MissingEnvVars(t *testing.T) {
 }
 
 func TestValidateImages_WithSpecImages(t *testing.T) {
-	// Clear all RELATED_IMAGE env vars
-	os.Unsetenv(mediav1alpha1.EnvRelatedImageImmich)
-	os.Unsetenv(mediav1alpha1.EnvRelatedImageMachineLearning)
-	os.Unsetenv(mediav1alpha1.EnvRelatedImageValkey)
-	os.Unsetenv(mediav1alpha1.EnvRelatedImagePostgres)
+	// Clear all RELATED_IMAGE env vars (t.Setenv to empty string and automatic cleanup)
+	t.Setenv(mediav1alpha1.EnvRelatedImageImmich, "")
+	t.Setenv(mediav1alpha1.EnvRelatedImageMachineLearning, "")
+	t.Setenv(mediav1alpha1.EnvRelatedImageValkey, "")
+	t.Setenv(mediav1alpha1.EnvRelatedImagePostgres, "")
 
 	r := &ImmichReconciler{}
 
@@ -235,16 +228,16 @@ func TestValidateImages_WithSpecImages(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: mediav1alpha1.ImmichSpec{
-			Server: mediav1alpha1.ServerSpec{
+			Server: &mediav1alpha1.ServerSpec{
 				Image: "ghcr.io/immich-app/immich-server:v1.0.0",
 			},
-			MachineLearning: mediav1alpha1.MachineLearningSpec{
+			MachineLearning: &mediav1alpha1.MachineLearningSpec{
 				Image: "ghcr.io/immich-app/immich-machine-learning:v1.0.0",
 			},
-			Valkey: mediav1alpha1.ValkeySpec{
+			Valkey: &mediav1alpha1.ValkeySpec{
 				Image: "docker.io/valkey/valkey:9-alpine",
 			},
-			Postgres: mediav1alpha1.PostgresSpec{
+			Postgres: &mediav1alpha1.PostgresSpec{
 				Image: "docker.io/tensorchord/pgvecto-rs:pg17-v0.4.0",
 			},
 		},

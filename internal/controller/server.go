@@ -47,7 +47,7 @@ func (r *ImmichReconciler) reconcileServer(ctx context.Context, immich *mediav1a
 	}
 
 	// Create Server Ingress if enabled
-	if immich.Spec.Server.Ingress.Enabled {
+	if immich.Spec.Server != nil && immich.Spec.Server.Ingress != nil && immich.Spec.Server.Ingress.Enabled {
 		if err := r.reconcileServerIngress(ctx, immich); err != nil {
 			return err
 		}
@@ -62,14 +62,14 @@ func (r *ImmichReconciler) reconcileServerDeployment(ctx context.Context, immich
 	labels := r.getLabels(immich, "server")
 	selectorLabels := r.getSelectorLabels(immich, "server")
 
-	replicas := int32(1)
-	if immich.Spec.Server.Replicas != nil {
-		replicas = *immich.Spec.Server.Replicas
-	}
+	serverSpec := ptr.Deref(immich.Spec.Server, mediav1alpha1.ServerSpec{})
+	immichConfig := ptr.Deref(immich.Spec.Immich, mediav1alpha1.ImmichConfig{})
+
+	replicas := ptr.Deref(serverSpec.Replicas, 1)
 
 	// Build environment variables
 	env := r.getServerEnv(immich)
-	env = append(env, immich.Spec.Server.Env...)
+	env = append(env, serverSpec.Env...)
 
 	// Build volume mounts and volumes
 	volumeMounts := r.getServerVolumeMounts(immich)
@@ -77,7 +77,7 @@ func (r *ImmichReconciler) reconcileServerDeployment(ctx context.Context, immich
 
 	// Add config checksum annotation if configuration exists
 	annotations := make(map[string]string)
-	for k, v := range immich.Spec.Server.PodAnnotations {
+	for k, v := range serverSpec.PodAnnotations {
 		annotations[k] = v
 	}
 
@@ -90,7 +90,7 @@ func (r *ImmichReconciler) reconcileServerDeployment(ctx context.Context, immich
 		},
 	}
 
-	if immich.Spec.Immich.Metrics.Enabled {
+	if immichConfig.Metrics != nil && immichConfig.Metrics.Enabled {
 		ports = append(ports,
 			corev1.ContainerPort{Name: "metrics-api", ContainerPort: 8081, Protocol: corev1.ProtocolTCP},
 			corev1.ContainerPort{Name: "metrics-ms", ContainerPort: 8082, Protocol: corev1.ProtocolTCP},
@@ -127,26 +127,26 @@ func (r *ImmichReconciler) reconcileServerDeployment(ctx context.Context, immich
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      r.mergeMaps(labels, immich.Spec.Server.PodLabels),
+					Labels:      r.mergeMaps(labels, serverSpec.PodLabels),
 					Annotations: annotations,
 				},
 				Spec: corev1.PodSpec{
-					SecurityContext:  immich.Spec.Server.PodSecurityContext,
+					SecurityContext:  serverSpec.PodSecurityContext,
 					ImagePullSecrets: immich.Spec.ImagePullSecrets,
-					NodeSelector:     immich.Spec.Server.NodeSelector,
-					Tolerations:      immich.Spec.Server.Tolerations,
-					Affinity:         immich.Spec.Server.Affinity,
+					NodeSelector:     serverSpec.NodeSelector,
+					Tolerations:      serverSpec.Tolerations,
+					Affinity:         serverSpec.Affinity,
 					InitContainers:   r.getServerInitContainers(immich),
 					Containers: []corev1.Container{
 						{
 							Name:            "server",
 							Image:           immich.GetServerImage(),
-							ImagePullPolicy: immich.Spec.Server.ImagePullPolicy,
+							ImagePullPolicy: serverSpec.ImagePullPolicy,
 							Env:             env,
-							EnvFrom:         immich.Spec.Server.EnvFrom,
+							EnvFrom:         serverSpec.EnvFrom,
 							Ports:           ports,
-							Resources:       immich.Spec.Server.Resources,
-							SecurityContext: immich.Spec.Server.SecurityContext,
+							Resources:       serverSpec.Resources,
+							SecurityContext: serverSpec.SecurityContext,
 							LivenessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
 									HTTPGet: &corev1.HTTPGetAction{
@@ -198,6 +198,10 @@ func (r *ImmichReconciler) reconcileServerDeployment(ctx context.Context, immich
 func (r *ImmichReconciler) getServerEnv(immich *mediav1alpha1.Immich) []corev1.EnvVar {
 	env := []corev1.EnvVar{}
 
+	valkeySpec := ptr.Deref(immich.Spec.Valkey, mediav1alpha1.ValkeySpec{})
+	postgresSpec := ptr.Deref(immich.Spec.Postgres, mediav1alpha1.PostgresSpec{})
+	immichConfig := ptr.Deref(immich.Spec.Immich, mediav1alpha1.ImmichConfig{})
+
 	// Redis/Valkey connection - uses helper to determine built-in vs external
 	valkeyHost := immich.GetValkeyHost()
 	if valkeyHost != "" {
@@ -210,24 +214,24 @@ func (r *ImmichReconciler) getServerEnv(immich *mediav1alpha1.Immich) []corev1.E
 			Value: fmt.Sprintf("%d", immich.GetValkeyPort()),
 		})
 		// Add password if configured (external Valkey)
-		if !immich.IsValkeyEnabled() && immich.Spec.Valkey.PasswordSecretRef != nil {
+		if !immich.IsValkeyEnabled() && valkeySpec.PasswordSecretRef != nil {
 			env = append(env, corev1.EnvVar{
 				Name: "REDIS_PASSWORD",
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
 						LocalObjectReference: corev1.LocalObjectReference{
-							Name: immich.Spec.Valkey.PasswordSecretRef.Name,
+							Name: valkeySpec.PasswordSecretRef.Name,
 						},
-						Key: immich.Spec.Valkey.PasswordSecretRef.Key,
+						Key: valkeySpec.PasswordSecretRef.Key,
 					},
 				},
 			})
 		}
 		// Add DB index if configured (external Valkey)
-		if !immich.IsValkeyEnabled() && immich.Spec.Valkey.DbIndex != 0 {
+		if !immich.IsValkeyEnabled() && valkeySpec.DbIndex != 0 {
 			env = append(env, corev1.EnvVar{
 				Name:  "REDIS_DBINDEX",
-				Value: fmt.Sprintf("%d", immich.Spec.Valkey.DbIndex),
+				Value: fmt.Sprintf("%d", valkeySpec.DbIndex),
 			})
 		}
 	}
@@ -236,7 +240,7 @@ func (r *ImmichReconciler) getServerEnv(immich *mediav1alpha1.Immich) []corev1.E
 	// which is auto-generated by the operator based on CR settings.
 
 	// Metrics
-	if immich.Spec.Immich.Metrics.Enabled {
+	if immichConfig.Metrics != nil && immichConfig.Metrics.Enabled {
 		env = append(env, corev1.EnvVar{
 			Name:  "IMMICH_TELEMETRY_INCLUDE",
 			Value: "all",
@@ -250,15 +254,15 @@ func (r *ImmichReconciler) getServerEnv(immich *mediav1alpha1.Immich) []corev1.E
 	})
 
 	// Database configuration - uses helper methods to determine built-in vs external
-	if immich.Spec.Postgres.URLSecretRef != nil {
+	if postgresSpec.URLSecretRef != nil {
 		env = append(env, corev1.EnvVar{
 			Name: "DB_URL",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: immich.Spec.Postgres.URLSecretRef.Name,
+						Name: postgresSpec.URLSecretRef.Name,
 					},
-					Key: immich.Spec.Postgres.URLSecretRef.Key,
+					Key: postgresSpec.URLSecretRef.Key,
 				},
 			},
 		})
@@ -309,13 +313,16 @@ func (r *ImmichReconciler) getServerInitContainers(immich *mediav1alpha1.Immich)
 		return initContainers // Skip init containers if no image is configured
 	}
 
+	postgresSpec := ptr.Deref(immich.Spec.Postgres, mediav1alpha1.PostgresSpec{})
+	valkeySpec := ptr.Deref(immich.Spec.Valkey, mediav1alpha1.ValkeySpec{})
+
 	// Wait for PostgreSQL
 	postgresHost := fmt.Sprintf("%s-postgres", immich.Name)
 	postgresPort := int32(5432)
-	if !immich.IsPostgresEnabled() && immich.Spec.Postgres.Host != "" {
-		postgresHost = immich.Spec.Postgres.Host
-		if immich.Spec.Postgres.Port != 0 {
-			postgresPort = immich.Spec.Postgres.Port
+	if !immich.IsPostgresEnabled() && postgresSpec.Host != "" {
+		postgresHost = postgresSpec.Host
+		if postgresSpec.Port != 0 {
+			postgresPort = postgresSpec.Port
 		}
 	}
 
@@ -334,13 +341,13 @@ echo "PostgreSQL is up"`, postgresHost, postgresPort, postgresHost, postgresPort
 	})
 
 	// Wait for Valkey/Redis
-	if immich.IsValkeyEnabled() || immich.Spec.Valkey.Host != "" {
+	if immich.IsValkeyEnabled() || valkeySpec.Host != "" {
 		valkeyHost := fmt.Sprintf("%s-valkey", immich.Name)
 		valkeyPort := int32(6379)
-		if !immich.IsValkeyEnabled() && immich.Spec.Valkey.Host != "" {
-			valkeyHost = immich.Spec.Valkey.Host
-			if immich.Spec.Valkey.Port != 0 {
-				valkeyPort = immich.Spec.Valkey.Port
+		if !immich.IsValkeyEnabled() && valkeySpec.Host != "" {
+			valkeyHost = valkeySpec.Host
+			if valkeySpec.Port != 0 {
+				valkeyPort = valkeySpec.Port
 			}
 		}
 
@@ -366,7 +373,11 @@ func (r *ImmichReconciler) getServerVolumeMounts(immich *mediav1alpha1.Immich) [
 	mounts := []corev1.VolumeMount{}
 
 	// Library mount (when using existing PVC or operator-managed PVC)
-	if immich.Spec.Immich.Persistence.Library.ExistingClaim != "" || immich.ShouldCreateLibraryPVC() {
+	immichConfig := ptr.Deref(immich.Spec.Immich, mediav1alpha1.ImmichConfig{})
+	persistence := ptr.Deref(immichConfig.Persistence, mediav1alpha1.PersistenceSpec{})
+	library := ptr.Deref(persistence.Library, mediav1alpha1.LibraryPersistenceSpec{})
+
+	if library.ExistingClaim != "" || immich.ShouldCreateLibraryPVC() {
 		mounts = append(mounts, corev1.VolumeMount{
 			Name:      "library",
 			MountPath: "/data",
@@ -387,7 +398,11 @@ func (r *ImmichReconciler) getServerVolumes(immich *mediav1alpha1.Immich) []core
 	volumes := []corev1.Volume{}
 
 	// Library volume (when using existing PVC or operator-managed PVC)
-	if immich.Spec.Immich.Persistence.Library.ExistingClaim != "" || immich.ShouldCreateLibraryPVC() {
+	immichConfig := ptr.Deref(immich.Spec.Immich, mediav1alpha1.ImmichConfig{})
+	persistence := ptr.Deref(immichConfig.Persistence, mediav1alpha1.PersistenceSpec{})
+	library := ptr.Deref(persistence.Library, mediav1alpha1.LibraryPersistenceSpec{})
+
+	if library.ExistingClaim != "" || immich.ShouldCreateLibraryPVC() {
 		volumes = append(volumes, corev1.Volume{
 			Name: "library",
 			VolumeSource: corev1.VolumeSource{
@@ -400,7 +415,7 @@ func (r *ImmichReconciler) getServerVolumes(immich *mediav1alpha1.Immich) []core
 
 	// Config volume - always created since we always generate a config
 	configName := fmt.Sprintf("%s-immich-config", immich.Name)
-	if immich.Spec.Immich.ConfigurationKind == "Secret" {
+	if immichConfig.ConfigurationKind == "Secret" {
 		volumes = append(volumes, corev1.Volume{
 			Name: "config",
 			VolumeSource: corev1.VolumeSource{
@@ -431,6 +446,8 @@ func (r *ImmichReconciler) reconcileServerService(ctx context.Context, immich *m
 	labels := r.getLabels(immich, "server")
 	selectorLabels := r.getSelectorLabels(immich, "server")
 
+	immichConfig := ptr.Deref(immich.Spec.Immich, mediav1alpha1.ImmichConfig{})
+
 	ports := []corev1.ServicePort{
 		{
 			Name:       "http",
@@ -440,7 +457,7 @@ func (r *ImmichReconciler) reconcileServerService(ctx context.Context, immich *m
 		},
 	}
 
-	if immich.Spec.Immich.Metrics.Enabled {
+	if immichConfig.Metrics != nil && immichConfig.Metrics.Enabled {
 		ports = append(ports,
 			corev1.ServicePort{Name: "metrics-api", Port: 8081, TargetPort: intstr.FromString("metrics-api"), Protocol: corev1.ProtocolTCP},
 			corev1.ServicePort{Name: "metrics-ms", Port: 8082, TargetPort: intstr.FromString("metrics-ms"), Protocol: corev1.ProtocolTCP},
@@ -482,9 +499,12 @@ func (r *ImmichReconciler) reconcileServerIngress(ctx context.Context, immich *m
 	name := fmt.Sprintf("%s-server", immich.Name)
 	labels := r.getLabels(immich, "server")
 
+	serverSpec := ptr.Deref(immich.Spec.Server, mediav1alpha1.ServerSpec{})
+	ingress := ptr.Deref(serverSpec.Ingress, mediav1alpha1.IngressSpec{})
+
 	// Build rules
-	var rules []networkingv1.IngressRule
-	for _, host := range immich.Spec.Server.Ingress.Hosts {
+	rules := make([]networkingv1.IngressRule, 0, len(ingress.Hosts))
+	for _, host := range ingress.Hosts {
 		var paths []networkingv1.HTTPIngressPath
 		for _, p := range host.Paths {
 			var pathType networkingv1.PathType
@@ -524,15 +544,15 @@ func (r *ImmichReconciler) reconcileServerIngress(ctx context.Context, immich *m
 	}
 
 	// Build TLS
-	var tls []networkingv1.IngressTLS
-	for _, t := range immich.Spec.Server.Ingress.TLS {
+	tls := make([]networkingv1.IngressTLS, 0, len(ingress.TLS))
+	for _, t := range ingress.TLS {
 		tls = append(tls, networkingv1.IngressTLS{
 			Hosts:      t.Hosts,
 			SecretName: t.SecretName,
 		})
 	}
 
-	ingress := &networkingv1.Ingress{
+	ingressObj := &networkingv1.Ingress{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: networkingv1.SchemeGroupVersion.String(),
 			Kind:       "Ingress",
@@ -541,7 +561,7 @@ func (r *ImmichReconciler) reconcileServerIngress(ctx context.Context, immich *m
 			Name:        name,
 			Namespace:   immich.Namespace,
 			Labels:      labels,
-			Annotations: immich.Spec.Server.Ingress.Annotations,
+			Annotations: ingress.Annotations,
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion:         immich.APIVersion,
@@ -554,11 +574,11 @@ func (r *ImmichReconciler) reconcileServerIngress(ctx context.Context, immich *m
 			},
 		},
 		Spec: networkingv1.IngressSpec{
-			IngressClassName: immich.Spec.Server.Ingress.IngressClassName,
+			IngressClassName: ingress.IngressClassName,
 			Rules:            rules,
 			TLS:              tls,
 		},
 	}
 
-	return r.apply(ctx, ingress)
+	return r.apply(ctx, ingressObj)
 }

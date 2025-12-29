@@ -61,8 +61,10 @@ func (r *ImmichReconciler) reconcilePostgres(ctx context.Context, immich *mediav
 func (r *ImmichReconciler) reconcilePostgresCredentials(ctx context.Context, immich *mediav1alpha1.Immich) error {
 	log := logf.FromContext(ctx)
 
+	postgresSpec := ptr.Deref(immich.Spec.Postgres, mediav1alpha1.PostgresSpec{})
+
 	// Skip if user provided explicit credentials
-	if immich.Spec.Postgres.PasswordSecretRef != nil {
+	if postgresSpec.PasswordSecretRef != nil {
 		log.V(1).Info("Using user-provided PostgreSQL credentials")
 		return nil
 	}
@@ -114,8 +116,9 @@ func (r *ImmichReconciler) reconcilePostgresCredentials(ctx context.Context, imm
 // getPostgresPasswordSecretRef returns the secret reference for PostgreSQL password
 // Returns generated secret name if no explicit credentials are provided
 func (r *ImmichReconciler) getPostgresPasswordSecretRef(immich *mediav1alpha1.Immich) *mediav1alpha1.SecretKeySelector {
-	if immich.Spec.Postgres.PasswordSecretRef != nil {
-		return immich.Spec.Postgres.PasswordSecretRef
+	postgresSpec := ptr.Deref(immich.Spec.Postgres, mediav1alpha1.PostgresSpec{})
+	if postgresSpec.PasswordSecretRef != nil {
+		return postgresSpec.PasswordSecretRef
 	}
 	// Use generated credentials secret
 	return &mediav1alpha1.SecretKeySelector{
@@ -128,6 +131,9 @@ func (r *ImmichReconciler) getPostgresPasswordSecretRef(immich *mediav1alpha1.Im
 func (r *ImmichReconciler) reconcilePostgresStatefulSet(ctx context.Context, immich *mediav1alpha1.Immich) error {
 	name := fmt.Sprintf("%s-postgres", immich.Name)
 	labels := r.getLabels(immich, "postgres")
+
+	postgresSpec := ptr.Deref(immich.Spec.Postgres, mediav1alpha1.PostgresSpec{})
+	persistence := ptr.Deref(postgresSpec.Persistence, mediav1alpha1.PostgresPersistenceSpec{})
 
 	image := immich.GetPostgresImage()
 	if image == "" {
@@ -165,13 +171,13 @@ func (r *ImmichReconciler) reconcilePostgresStatefulSet(ctx context.Context, imm
 
 	// Build volumes - only needed if using an existing claim
 	var volumes []corev1.Volume
-	if immich.Spec.Postgres.Persistence.ExistingClaim != "" {
+	if persistence.ExistingClaim != "" {
 		volumes = []corev1.Volume{
 			{
 				Name: "data",
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: immich.Spec.Postgres.Persistence.ExistingClaim,
+						ClaimName: persistence.ExistingClaim,
 					},
 				},
 			},
@@ -180,13 +186,13 @@ func (r *ImmichReconciler) reconcilePostgresStatefulSet(ctx context.Context, imm
 
 	// Build VolumeClaimTemplate for automatic PVC management (if not using existing claim)
 	var volumeClaimTemplates []corev1.PersistentVolumeClaim
-	if immich.Spec.Postgres.Persistence.ExistingClaim == "" {
-		size := immich.Spec.Postgres.Persistence.Size
+	if persistence.ExistingClaim == "" {
+		size := persistence.Size
 		if size.IsZero() {
 			size = resource.MustParse("10Gi")
 		}
 
-		accessModes := immich.Spec.Postgres.Persistence.AccessModes
+		accessModes := persistence.AccessModes
 		if len(accessModes) == 0 {
 			accessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
 		}
@@ -199,7 +205,7 @@ func (r *ImmichReconciler) reconcilePostgresStatefulSet(ctx context.Context, imm
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
 					AccessModes:      accessModes,
-					StorageClassName: immich.Spec.Postgres.Persistence.StorageClass,
+					StorageClassName: persistence.StorageClass,
 					Resources: corev1.VolumeResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceStorage: size,
@@ -240,20 +246,20 @@ func (r *ImmichReconciler) reconcilePostgresStatefulSet(ctx context.Context, imm
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      labels,
-					Annotations: immich.Spec.Postgres.PodAnnotations,
+					Annotations: postgresSpec.PodAnnotations,
 				},
 				Spec: corev1.PodSpec{
 					ImagePullSecrets: immich.Spec.ImagePullSecrets,
-					SecurityContext:  immich.Spec.Postgres.PodSecurityContext,
-					NodeSelector:     immich.Spec.Postgres.NodeSelector,
-					Tolerations:      immich.Spec.Postgres.Tolerations,
-					Affinity:         immich.Spec.Postgres.Affinity,
+					SecurityContext:  postgresSpec.PodSecurityContext,
+					NodeSelector:     postgresSpec.NodeSelector,
+					Tolerations:      postgresSpec.Tolerations,
+					Affinity:         postgresSpec.Affinity,
 					Volumes:          volumes,
 					Containers: []corev1.Container{
 						{
 							Name:            "postgres",
 							Image:           image,
-							ImagePullPolicy: immich.Spec.Postgres.ImagePullPolicy,
+							ImagePullPolicy: postgresSpec.ImagePullPolicy,
 							Env:             env,
 							Ports: []corev1.ContainerPort{
 								{
@@ -263,8 +269,8 @@ func (r *ImmichReconciler) reconcilePostgresStatefulSet(ctx context.Context, imm
 								},
 							},
 							VolumeMounts:    volumeMounts,
-							Resources:       immich.Spec.Postgres.Resources,
-							SecurityContext: immich.Spec.Postgres.SecurityContext,
+							Resources:       postgresSpec.Resources,
+							SecurityContext: postgresSpec.SecurityContext,
 							ReadinessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{

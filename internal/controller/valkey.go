@@ -38,8 +38,11 @@ func (r *ImmichReconciler) reconcileValkey(ctx context.Context, immich *mediav1a
 	log := logf.FromContext(ctx)
 	log.V(1).Info("Reconciling Valkey")
 
+	valkeySpec := ptr.Deref(immich.Spec.Valkey, mediav1alpha1.ValkeySpec{})
+	persistence := ptr.Deref(valkeySpec.Persistence, mediav1alpha1.ValkeyPersistenceSpec{})
+
 	// Create Valkey PVC if persistence is enabled (must be created before deployment)
-	if immich.Spec.Valkey.Persistence.Enabled != nil && *immich.Spec.Valkey.Persistence.Enabled {
+	if persistence.Enabled != nil && *persistence.Enabled {
 		if err := r.reconcileValkeyPVC(ctx, immich); err != nil {
 			return err
 		}
@@ -63,6 +66,8 @@ func (r *ImmichReconciler) reconcileValkeyDeployment(ctx context.Context, immich
 	name := fmt.Sprintf("%s-valkey", immich.Name)
 	labels := r.getLabels(immich, "valkey")
 	selectorLabels := r.getSelectorLabels(immich, "valkey")
+
+	valkeySpec := ptr.Deref(immich.Spec.Valkey, mediav1alpha1.ValkeySpec{})
 
 	deployment := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
@@ -94,20 +99,20 @@ func (r *ImmichReconciler) reconcileValkeyDeployment(ctx context.Context, immich
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      r.mergeMaps(labels, immich.Spec.Valkey.PodLabels),
-					Annotations: immich.Spec.Valkey.PodAnnotations,
+					Labels:      r.mergeMaps(labels, valkeySpec.PodLabels),
+					Annotations: valkeySpec.PodAnnotations,
 				},
 				Spec: corev1.PodSpec{
-					SecurityContext:  immich.Spec.Valkey.PodSecurityContext,
+					SecurityContext:  valkeySpec.PodSecurityContext,
 					ImagePullSecrets: immich.Spec.ImagePullSecrets,
-					NodeSelector:     immich.Spec.Valkey.NodeSelector,
-					Tolerations:      immich.Spec.Valkey.Tolerations,
-					Affinity:         immich.Spec.Valkey.Affinity,
+					NodeSelector:     valkeySpec.NodeSelector,
+					Tolerations:      valkeySpec.Tolerations,
+					Affinity:         valkeySpec.Affinity,
 					Containers: []corev1.Container{
 						{
 							Name:            "valkey",
 							Image:           immich.GetValkeyImage(),
-							ImagePullPolicy: immich.Spec.Valkey.ImagePullPolicy,
+							ImagePullPolicy: valkeySpec.ImagePullPolicy,
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "redis",
@@ -115,8 +120,8 @@ func (r *ImmichReconciler) reconcileValkeyDeployment(ctx context.Context, immich
 									Protocol:      corev1.ProtocolTCP,
 								},
 							},
-							Resources:       immich.Spec.Valkey.Resources,
-							SecurityContext: immich.Spec.Valkey.SecurityContext,
+							Resources:       valkeySpec.Resources,
+							SecurityContext: valkeySpec.SecurityContext,
 							LivenessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
@@ -152,7 +157,10 @@ func (r *ImmichReconciler) reconcileValkeyDeployment(ctx context.Context, immich
 }
 
 func (r *ImmichReconciler) getValkeyVolumeMounts(immich *mediav1alpha1.Immich) []corev1.VolumeMount {
-	if immich.Spec.Valkey.Persistence.Enabled != nil && *immich.Spec.Valkey.Persistence.Enabled {
+	valkeySpec := ptr.Deref(immich.Spec.Valkey, mediav1alpha1.ValkeySpec{})
+	persistence := ptr.Deref(valkeySpec.Persistence, mediav1alpha1.ValkeyPersistenceSpec{})
+
+	if persistence.Enabled != nil && *persistence.Enabled {
 		return []corev1.VolumeMount{
 			{
 				Name:      "data",
@@ -164,10 +172,13 @@ func (r *ImmichReconciler) getValkeyVolumeMounts(immich *mediav1alpha1.Immich) [
 }
 
 func (r *ImmichReconciler) getValkeyVolumes(immich *mediav1alpha1.Immich) []corev1.Volume {
-	if immich.Spec.Valkey.Persistence.Enabled != nil && *immich.Spec.Valkey.Persistence.Enabled {
+	valkeySpec := ptr.Deref(immich.Spec.Valkey, mediav1alpha1.ValkeySpec{})
+	persistence := ptr.Deref(valkeySpec.Persistence, mediav1alpha1.ValkeyPersistenceSpec{})
+
+	if persistence.Enabled != nil && *persistence.Enabled {
 		pvcName := fmt.Sprintf("%s-valkey-data", immich.Name)
-		if immich.Spec.Valkey.Persistence.ExistingClaim != "" {
-			pvcName = immich.Spec.Valkey.Persistence.ExistingClaim
+		if persistence.ExistingClaim != "" {
+			pvcName = persistence.ExistingClaim
 		}
 		return []corev1.Volume{
 			{
@@ -234,7 +245,10 @@ func (r *ImmichReconciler) reconcileValkeyService(ctx context.Context, immich *m
 }
 
 func (r *ImmichReconciler) reconcileValkeyPVC(ctx context.Context, immich *mediav1alpha1.Immich) error {
-	if immich.Spec.Valkey.Persistence.ExistingClaim != "" {
+	valkeySpec := ptr.Deref(immich.Spec.Valkey, mediav1alpha1.ValkeySpec{})
+	persistence := ptr.Deref(valkeySpec.Persistence, mediav1alpha1.ValkeyPersistenceSpec{})
+
+	if persistence.ExistingClaim != "" {
 		return nil // Using existing PVC
 	}
 
@@ -252,12 +266,12 @@ func (r *ImmichReconciler) reconcileValkeyPVC(ctx context.Context, immich *media
 		return err
 	}
 
-	size := immich.Spec.Valkey.Persistence.Size
+	size := persistence.Size
 	if size.IsZero() {
 		size = resource.MustParse("10Gi")
 	}
 
-	accessModes := immich.Spec.Valkey.Persistence.AccessModes
+	accessModes := persistence.AccessModes
 	if len(accessModes) == 0 {
 		accessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
 	}
@@ -285,7 +299,7 @@ func (r *ImmichReconciler) reconcileValkeyPVC(ctx context.Context, immich *media
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes:      accessModes,
-			StorageClassName: immich.Spec.Valkey.Persistence.StorageClass,
+			StorageClassName: persistence.StorageClass,
 			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceStorage: size,

@@ -420,10 +420,9 @@ spec:
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                   configurationKind:
-                    default: ConfigMap
                     description: |-
                       ConfigurationKind sets the resource Kind to store configuration in.
-                      Must be either ConfigMap or Secret.
+                      Must be either ConfigMap or Secret. Defaults to ConfigMap.
                     enum:
                     - ConfigMap
                     - Secret

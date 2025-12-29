@@ -38,9 +38,13 @@ func (r *ImmichReconciler) reconcileMachineLearning(ctx context.Context, immich 
 	log := logf.FromContext(ctx)
 	log.V(1).Info("Reconciling Machine Learning")
 
+	mlSpec := ptr.Deref(immich.Spec.MachineLearning, mediav1alpha1.MachineLearningSpec{})
+	persistence := ptr.Deref(mlSpec.Persistence, mediav1alpha1.MachineLearningPersistenceSpec{})
+
 	// Create ML PVC first if persistence is enabled (must exist before deployment)
-	persistenceEnabled := immich.Spec.MachineLearning.Persistence.Enabled
-	if persistenceEnabled == nil || *persistenceEnabled {
+	// Default is enabled (nil or true)
+	persistenceEnabled := persistence.Enabled == nil || *persistence.Enabled
+	if persistenceEnabled {
 		if err := r.reconcileMLPVC(ctx, immich); err != nil {
 			return err
 		}
@@ -65,17 +69,15 @@ func (r *ImmichReconciler) reconcileMLDeployment(ctx context.Context, immich *me
 	labels := r.getLabels(immich, "machine-learning")
 	selectorLabels := r.getSelectorLabels(immich, "machine-learning")
 
-	replicas := int32(1)
-	if immich.Spec.MachineLearning.Replicas != nil {
-		replicas = *immich.Spec.MachineLearning.Replicas
-	}
+	mlSpec := ptr.Deref(immich.Spec.MachineLearning, mediav1alpha1.MachineLearningSpec{})
+	replicas := ptr.Deref(mlSpec.Replicas, 1)
 
 	env := []corev1.EnvVar{
 		{Name: "TRANSFORMERS_CACHE", Value: "/cache"},
 		{Name: "HF_XET_CACHE", Value: "/cache/huggingface-xet"},
 		{Name: "MPLCONFIGDIR", Value: "/cache/matplotlib-config"},
 	}
-	env = append(env, immich.Spec.MachineLearning.Env...)
+	env = append(env, mlSpec.Env...)
 
 	deployment := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
@@ -107,22 +109,22 @@ func (r *ImmichReconciler) reconcileMLDeployment(ctx context.Context, immich *me
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      r.mergeMaps(labels, immich.Spec.MachineLearning.PodLabels),
-					Annotations: immich.Spec.MachineLearning.PodAnnotations,
+					Labels:      r.mergeMaps(labels, mlSpec.PodLabels),
+					Annotations: mlSpec.PodAnnotations,
 				},
 				Spec: corev1.PodSpec{
-					SecurityContext:  immich.Spec.MachineLearning.PodSecurityContext,
+					SecurityContext:  mlSpec.PodSecurityContext,
 					ImagePullSecrets: immich.Spec.ImagePullSecrets,
-					NodeSelector:     immich.Spec.MachineLearning.NodeSelector,
-					Tolerations:      immich.Spec.MachineLearning.Tolerations,
-					Affinity:         immich.Spec.MachineLearning.Affinity,
+					NodeSelector:     mlSpec.NodeSelector,
+					Tolerations:      mlSpec.Tolerations,
+					Affinity:         mlSpec.Affinity,
 					Containers: []corev1.Container{
 						{
 							Name:            "machine-learning",
 							Image:           immich.GetMachineLearningImage(),
-							ImagePullPolicy: immich.Spec.MachineLearning.ImagePullPolicy,
+							ImagePullPolicy: mlSpec.ImagePullPolicy,
 							Env:             env,
-							EnvFrom:         immich.Spec.MachineLearning.EnvFrom,
+							EnvFrom:         mlSpec.EnvFrom,
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "http",
@@ -130,8 +132,8 @@ func (r *ImmichReconciler) reconcileMLDeployment(ctx context.Context, immich *me
 									Protocol:      corev1.ProtocolTCP,
 								},
 							},
-							Resources:       immich.Spec.MachineLearning.Resources,
-							SecurityContext: immich.Spec.MachineLearning.SecurityContext,
+							Resources:       mlSpec.Resources,
+							SecurityContext: mlSpec.SecurityContext,
 							LivenessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
 									HTTPGet: &corev1.HTTPGetAction{
@@ -190,8 +192,11 @@ func (r *ImmichReconciler) getMLVolumeMounts(_ *mediav1alpha1.Immich) []corev1.V
 }
 
 func (r *ImmichReconciler) getMLVolumes(immich *mediav1alpha1.Immich) []corev1.Volume {
-	persistenceEnabled := immich.Spec.MachineLearning.Persistence.Enabled
-	if persistenceEnabled != nil && !*persistenceEnabled {
+	mlSpec := ptr.Deref(immich.Spec.MachineLearning, mediav1alpha1.MachineLearningSpec{})
+	persistence := ptr.Deref(mlSpec.Persistence, mediav1alpha1.MachineLearningPersistenceSpec{})
+
+	// Check if persistence is disabled
+	if persistence.Enabled != nil && !*persistence.Enabled {
 		return []corev1.Volume{
 			{
 				Name: "cache",
@@ -202,9 +207,10 @@ func (r *ImmichReconciler) getMLVolumes(immich *mediav1alpha1.Immich) []corev1.V
 		}
 	}
 
+	// Persistence is enabled (default)
 	pvcName := fmt.Sprintf("%s-ml-cache", immich.Name)
-	if immich.Spec.MachineLearning.Persistence.ExistingClaim != "" {
-		pvcName = immich.Spec.MachineLearning.Persistence.ExistingClaim
+	if persistence.ExistingClaim != "" {
+		pvcName = persistence.ExistingClaim
 	}
 
 	return []corev1.Volume{
@@ -263,7 +269,10 @@ func (r *ImmichReconciler) reconcileMLService(ctx context.Context, immich *media
 }
 
 func (r *ImmichReconciler) reconcileMLPVC(ctx context.Context, immich *mediav1alpha1.Immich) error {
-	if immich.Spec.MachineLearning.Persistence.ExistingClaim != "" {
+	mlSpec := ptr.Deref(immich.Spec.MachineLearning, mediav1alpha1.MachineLearningSpec{})
+	persistence := ptr.Deref(mlSpec.Persistence, mediav1alpha1.MachineLearningPersistenceSpec{})
+
+	if persistence.ExistingClaim != "" {
 		return nil // Using existing PVC
 	}
 
@@ -281,12 +290,12 @@ func (r *ImmichReconciler) reconcileMLPVC(ctx context.Context, immich *mediav1al
 		return err
 	}
 
-	size := immich.Spec.MachineLearning.Persistence.Size
+	size := persistence.Size
 	if size.IsZero() {
 		size = resource.MustParse("10Gi")
 	}
 
-	accessModes := immich.Spec.MachineLearning.Persistence.AccessModes
+	accessModes := persistence.AccessModes
 	if len(accessModes) == 0 {
 		accessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
 	}
@@ -314,7 +323,7 @@ func (r *ImmichReconciler) reconcileMLPVC(ctx context.Context, immich *mediav1al
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes:      accessModes,
-			StorageClassName: immich.Spec.MachineLearning.Persistence.StorageClass,
+			StorageClassName: persistence.StorageClass,
 			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceStorage: size,

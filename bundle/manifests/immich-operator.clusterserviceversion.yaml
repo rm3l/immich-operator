@@ -137,7 +137,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-12-29T14:03:04Z"
+    createdAt: "2025-12-29T15:20:48Z"
     operators.operatorframework.io/builder: operator-sdk-v1.42.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: immich-operator.v0.0.1

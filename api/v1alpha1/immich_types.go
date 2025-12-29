@@ -42,34 +42,34 @@ type ImmichSpec struct {
 
 	// Immich shared configuration
 	// +optional
-	Immich ImmichConfig `json:"immich,omitempty"`
+	Immich *ImmichConfig `json:"immich,omitempty"`
 
 	// Server component configuration
 	// +optional
-	Server ServerSpec `json:"server,omitempty"`
+	Server *ServerSpec `json:"server,omitempty"`
 
 	// MachineLearning component configuration
 	// +optional
-	MachineLearning MachineLearningSpec `json:"machineLearning,omitempty"`
+	MachineLearning *MachineLearningSpec `json:"machineLearning,omitempty"`
 
 	// Valkey (Redis) component configuration
 	// +optional
-	Valkey ValkeySpec `json:"valkey,omitempty"`
+	Valkey *ValkeySpec `json:"valkey,omitempty"`
 
 	// PostgreSQL database configuration
 	// +optional
-	Postgres PostgresSpec `json:"postgres,omitempty"`
+	Postgres *PostgresSpec `json:"postgres,omitempty"`
 }
 
 // ImmichConfig defines shared Immich configuration.
 type ImmichConfig struct {
 	// Metrics configuration
 	// +optional
-	Metrics MetricsSpec `json:"metrics,omitempty"`
+	Metrics *MetricsSpec `json:"metrics,omitempty"`
 
 	// Persistence configuration for photo library
 	// +optional
-	Persistence PersistenceSpec `json:"persistence,omitempty"`
+	Persistence *PersistenceSpec `json:"persistence,omitempty"`
 
 	// Configuration is immich-config.yaml converted to raw YAML
 	// ref: https://immich.app/docs/install/config-file/
@@ -78,9 +78,8 @@ type ImmichConfig struct {
 	Configuration *ConfigurationSpec `json:"configuration,omitempty"`
 
 	// ConfigurationKind sets the resource Kind to store configuration in.
-	// Must be either ConfigMap or Secret.
+	// Must be either ConfigMap or Secret. Defaults to ConfigMap.
 	// +kubebuilder:validation:Enum=ConfigMap;Secret
-	// +kubebuilder:default="ConfigMap"
 	// +optional
 	ConfigurationKind string `json:"configurationKind,omitempty"`
 }
@@ -352,7 +351,7 @@ type MetricsSpec struct {
 type PersistenceSpec struct {
 	// Library persistence configuration for photo storage
 	// +optional
-	Library LibraryPersistenceSpec `json:"library,omitempty"`
+	Library *LibraryPersistenceSpec `json:"library,omitempty"`
 }
 
 // LibraryPersistenceSpec defines library persistence configuration.
@@ -428,7 +427,7 @@ type ServerSpec struct {
 
 	// Ingress configuration
 	// +optional
-	Ingress IngressSpec `json:"ingress,omitempty"`
+	Ingress *IngressSpec `json:"ingress,omitempty"`
 
 	// Pod annotations
 	// +optional
@@ -498,7 +497,7 @@ type MachineLearningSpec struct {
 
 	// Persistence configuration for ML cache
 	// +optional
-	Persistence MachineLearningPersistenceSpec `json:"persistence,omitempty"`
+	Persistence *MachineLearningPersistenceSpec `json:"persistence,omitempty"`
 
 	// Pod annotations
 	// +optional
@@ -575,7 +574,7 @@ type ValkeySpec struct {
 
 	// Persistence configuration for Valkey data
 	// +optional
-	Persistence ValkeyPersistenceSpec `json:"persistence,omitempty"`
+	Persistence *ValkeyPersistenceSpec `json:"persistence,omitempty"`
 
 	// Node selector
 	// +optional
@@ -697,7 +696,7 @@ type PostgresSpec struct {
 
 	// Persistence configuration for PostgreSQL data
 	// +optional
-	Persistence PostgresPersistenceSpec `json:"persistence,omitempty"`
+	Persistence *PostgresPersistenceSpec `json:"persistence,omitempty"`
 
 	// Node selector
 	// +optional
@@ -882,7 +881,7 @@ func init() {
 
 // IsServerEnabled returns true if the server component is enabled
 func (i *Immich) IsServerEnabled() bool {
-	if i.Spec.Server.Enabled == nil {
+	if i.Spec.Server == nil || i.Spec.Server.Enabled == nil {
 		return true // default to enabled
 	}
 	return *i.Spec.Server.Enabled
@@ -890,7 +889,7 @@ func (i *Immich) IsServerEnabled() bool {
 
 // IsMachineLearningEnabled returns true if the ML component is enabled
 func (i *Immich) IsMachineLearningEnabled() bool {
-	if i.Spec.MachineLearning.Enabled == nil {
+	if i.Spec.MachineLearning == nil || i.Spec.MachineLearning.Enabled == nil {
 		return true // default to enabled
 	}
 	return *i.Spec.MachineLearning.Enabled
@@ -898,7 +897,7 @@ func (i *Immich) IsMachineLearningEnabled() bool {
 
 // IsValkeyEnabled returns true if the Valkey component is enabled
 func (i *Immich) IsValkeyEnabled() bool {
-	if i.Spec.Valkey.Enabled == nil {
+	if i.Spec.Valkey == nil || i.Spec.Valkey.Enabled == nil {
 		return true // default to enabled
 	}
 	return *i.Spec.Valkey.Enabled
@@ -906,12 +905,12 @@ func (i *Immich) IsValkeyEnabled() bool {
 
 // GetServerImage returns the full server image reference
 // Priority order:
-// 1. spec.server.image.image (user-specified in CR takes precedence)
-// 2. RELATED_IMAGE_IMMICH environment variable (for disconnected environments)
+// 1. spec.server.image (user-specified in CR takes precedence)
+// 2. RELATED_IMAGE_immich environment variable (for disconnected environments)
 // Returns empty string if neither is set (caller should handle as error)
 func (i *Immich) GetServerImage() string {
 	// User-specified image takes precedence
-	if i.Spec.Server.Image != "" {
+	if i.Spec.Server != nil && i.Spec.Server.Image != "" {
 		return i.Spec.Server.Image
 	}
 
@@ -921,12 +920,12 @@ func (i *Immich) GetServerImage() string {
 
 // GetMachineLearningImage returns the full ML image reference
 // Priority order:
-// 1. spec.machineLearning.image.image (user-specified in CR takes precedence)
-// 2. RELATED_IMAGE_MACHINE_LEARNING environment variable (for disconnected environments)
+// 1. spec.machineLearning.image (user-specified in CR takes precedence)
+// 2. RELATED_IMAGE_machineLearning environment variable (for disconnected environments)
 // Returns empty string if neither is set (caller should handle as error)
 func (i *Immich) GetMachineLearningImage() string {
 	// User-specified image takes precedence
-	if i.Spec.MachineLearning.Image != "" {
+	if i.Spec.MachineLearning != nil && i.Spec.MachineLearning.Image != "" {
 		return i.Spec.MachineLearning.Image
 	}
 
@@ -936,12 +935,12 @@ func (i *Immich) GetMachineLearningImage() string {
 
 // GetValkeyImage returns the full Valkey image reference
 // Priority order:
-// 1. spec.valkey.image.image (user-specified in CR takes precedence)
-// 2. RELATED_IMAGE_VALKEY environment variable (for disconnected environments)
+// 1. spec.valkey.image (user-specified in CR takes precedence)
+// 2. RELATED_IMAGE_valkey environment variable (for disconnected environments)
 // Returns empty string if neither is set (caller should handle as error)
 func (i *Immich) GetValkeyImage() string {
 	// User-specified image takes precedence
-	if i.Spec.Valkey.Image != "" {
+	if i.Spec.Valkey != nil && i.Spec.Valkey.Image != "" {
 		return i.Spec.Valkey.Image
 	}
 
@@ -952,8 +951,10 @@ func (i *Immich) GetValkeyImage() string {
 // GetLibraryPVCName returns the name of the PVC to use for the photo library.
 // Returns the existingClaim if set, otherwise generates a name based on the Immich resource name.
 func (i *Immich) GetLibraryPVCName() string {
-	if i.Spec.Immich.Persistence.Library.ExistingClaim != "" {
-		return i.Spec.Immich.Persistence.Library.ExistingClaim
+	if i.Spec.Immich != nil && i.Spec.Immich.Persistence != nil && i.Spec.Immich.Persistence.Library != nil {
+		if i.Spec.Immich.Persistence.Library.ExistingClaim != "" {
+			return i.Spec.Immich.Persistence.Library.ExistingClaim
+		}
 	}
 	return i.Name + "-library"
 }
@@ -961,14 +962,19 @@ func (i *Immich) GetLibraryPVCName() string {
 // ShouldCreateLibraryPVC returns true if the operator should create a PVC for the library.
 // This is true when existingClaim is not set (a default size will be used if not specified).
 func (i *Immich) ShouldCreateLibraryPVC() bool {
-	return i.Spec.Immich.Persistence.Library.ExistingClaim == ""
+	if i.Spec.Immich != nil && i.Spec.Immich.Persistence != nil && i.Spec.Immich.Persistence.Library != nil {
+		return i.Spec.Immich.Persistence.Library.ExistingClaim == ""
+	}
+	return true // default to creating a PVC
 }
 
 // GetLibrarySize returns the size for the library PVC.
 // Defaults to 10Gi if not specified.
 func (i *Immich) GetLibrarySize() resource.Quantity {
-	if !i.Spec.Immich.Persistence.Library.Size.IsZero() {
-		return i.Spec.Immich.Persistence.Library.Size
+	if i.Spec.Immich != nil && i.Spec.Immich.Persistence != nil && i.Spec.Immich.Persistence.Library != nil {
+		if !i.Spec.Immich.Persistence.Library.Size.IsZero() {
+			return i.Spec.Immich.Persistence.Library.Size
+		}
 	}
 	return resource.MustParse("10Gi")
 }
@@ -976,15 +982,25 @@ func (i *Immich) GetLibrarySize() resource.Quantity {
 // GetLibraryAccessModes returns the access modes for the library PVC.
 // Defaults to ReadWriteOnce if not specified.
 func (i *Immich) GetLibraryAccessModes() []corev1.PersistentVolumeAccessMode {
-	if len(i.Spec.Immich.Persistence.Library.AccessModes) > 0 {
-		return i.Spec.Immich.Persistence.Library.AccessModes
+	if i.Spec.Immich != nil && i.Spec.Immich.Persistence != nil && i.Spec.Immich.Persistence.Library != nil {
+		if len(i.Spec.Immich.Persistence.Library.AccessModes) > 0 {
+			return i.Spec.Immich.Persistence.Library.AccessModes
+		}
 	}
 	return []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
 }
 
+// GetLibraryStorageClass returns the storage class for the library PVC.
+func (i *Immich) GetLibraryStorageClass() string {
+	if i.Spec.Immich != nil && i.Spec.Immich.Persistence != nil && i.Spec.Immich.Persistence.Library != nil {
+		return i.Spec.Immich.Persistence.Library.StorageClass
+	}
+	return ""
+}
+
 // IsPostgresEnabled returns true if the built-in PostgreSQL is enabled
 func (i *Immich) IsPostgresEnabled() bool {
-	if i.Spec.Postgres.Enabled == nil {
+	if i.Spec.Postgres == nil || i.Spec.Postgres.Enabled == nil {
 		return true // default to enabled
 	}
 	return *i.Spec.Postgres.Enabled
@@ -996,7 +1012,7 @@ func (i *Immich) IsPostgresEnabled() bool {
 // 2. RELATED_IMAGE_postgres environment variable (for disconnected environments)
 // Returns empty string if neither is set (caller should handle as error)
 func (i *Immich) GetPostgresImage() string {
-	if i.Spec.Postgres.Image != "" {
+	if i.Spec.Postgres != nil && i.Spec.Postgres.Image != "" {
 		return i.Spec.Postgres.Image
 	}
 	return os.Getenv(EnvRelatedImagePostgres)
@@ -1011,8 +1027,10 @@ func GetImmichInitContainerImage() string {
 // GetPostgresPVCName returns the name of the PVC for PostgreSQL data.
 // When using VolumeClaimTemplates, the PVC is named: <volumeClaimTemplate.name>-<statefulset.name>-<ordinal>
 func (i *Immich) GetPostgresPVCName() string {
-	if i.Spec.Postgres.Persistence.ExistingClaim != "" {
-		return i.Spec.Postgres.Persistence.ExistingClaim
+	if i.Spec.Postgres != nil && i.Spec.Postgres.Persistence != nil {
+		if i.Spec.Postgres.Persistence.ExistingClaim != "" {
+			return i.Spec.Postgres.Persistence.ExistingClaim
+		}
 	}
 	// VolumeClaimTemplate name is "data", StatefulSet name is "<immich.name>-postgres", ordinal is 0
 	return "data-" + i.Name + "-postgres-0"
@@ -1024,31 +1042,34 @@ func (i *Immich) GetPostgresHost() string {
 	if i.IsPostgresEnabled() {
 		return i.Name + "-postgres"
 	}
-	return i.Spec.Postgres.Host
+	if i.Spec.Postgres != nil {
+		return i.Spec.Postgres.Host
+	}
+	return ""
 }
 
 // GetPostgresPort returns the port for PostgreSQL connection.
 func (i *Immich) GetPostgresPort() int32 {
-	if i.Spec.Postgres.Port == 0 {
-		return 5432
+	if i.Spec.Postgres != nil && i.Spec.Postgres.Port != 0 {
+		return i.Spec.Postgres.Port
 	}
-	return i.Spec.Postgres.Port
+	return 5432
 }
 
 // GetPostgresDatabase returns the database name.
 func (i *Immich) GetPostgresDatabase() string {
-	if i.Spec.Postgres.Database == "" {
-		return "immich"
+	if i.Spec.Postgres != nil && i.Spec.Postgres.Database != "" {
+		return i.Spec.Postgres.Database
 	}
-	return i.Spec.Postgres.Database
+	return "immich"
 }
 
 // GetPostgresUsername returns the username for PostgreSQL.
 func (i *Immich) GetPostgresUsername() string {
-	if i.Spec.Postgres.Username == "" {
-		return "immich"
+	if i.Spec.Postgres != nil && i.Spec.Postgres.Username != "" {
+		return i.Spec.Postgres.Username
 	}
-	return i.Spec.Postgres.Username
+	return "immich"
 }
 
 // GetValkeyHost returns the hostname to connect to Valkey/Redis.
@@ -1057,15 +1078,18 @@ func (i *Immich) GetValkeyHost() string {
 	if i.IsValkeyEnabled() {
 		return i.Name + "-valkey"
 	}
-	return i.Spec.Valkey.Host
+	if i.Spec.Valkey != nil {
+		return i.Spec.Valkey.Host
+	}
+	return ""
 }
 
 // GetValkeyPort returns the port for Valkey/Redis connection.
 func (i *Immich) GetValkeyPort() int32 {
-	if i.Spec.Valkey.Port == 0 {
-		return 6379
+	if i.Spec.Valkey != nil && i.Spec.Valkey.Port != 0 {
+		return i.Spec.Valkey.Port
 	}
-	return i.Spec.Valkey.Port
+	return 6379
 }
 
 // GetMachineLearningURL returns the URL for the machine learning service.
@@ -1074,5 +1098,8 @@ func (i *Immich) GetMachineLearningURL() string {
 	if i.IsMachineLearningEnabled() {
 		return "http://" + i.Name + "-machine-learning:3003"
 	}
-	return i.Spec.MachineLearning.URL
+	if i.Spec.MachineLearning != nil {
+		return i.Spec.MachineLearning.URL
+	}
+	return ""
 }

@@ -51,9 +51,10 @@ func (r *ImmichReconciler) reconcileLibraryPVC(ctx context.Context, immich *medi
 	}
 
 	// Create new PVC (without owner reference for data safety)
-	var storageClassName *string
-	if immich.Spec.Immich.Persistence.Library.StorageClass != "" {
-		storageClassName = &immich.Spec.Immich.Persistence.Library.StorageClass
+	storageClassName := immich.GetLibraryStorageClass()
+	var storageClassNamePtr *string
+	if storageClassName != "" {
+		storageClassNamePtr = &storageClassName
 	}
 
 	size := immich.GetLibrarySize()
@@ -65,7 +66,7 @@ func (r *ImmichReconciler) reconcileLibraryPVC(ctx context.Context, immich *medi
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes:      immich.GetLibraryAccessModes(),
-			StorageClassName: storageClassName,
+			StorageClassName: storageClassNamePtr,
 			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceStorage: size,

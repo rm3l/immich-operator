@@ -18,6 +18,7 @@ package controller
 
 import (
 	"testing"
+	"unicode"
 )
 
 func TestMergeMaps(t *testing.T) {
@@ -141,7 +142,7 @@ func TestGenerateRandomPassword(t *testing.T) {
 			}
 			// Verify all characters are alphanumeric
 			for _, c := range password {
-				if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+				if !unicode.IsLetter(c) && !unicode.IsDigit(c) {
 					t.Errorf("generateRandomPassword() contains invalid character: %c", c)
 				}
 			}

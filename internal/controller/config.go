@@ -36,6 +36,7 @@ func (r *ImmichReconciler) reconcileImmichConfig(ctx context.Context, immich *me
 	log.V(1).Info("Reconciling Immich configuration")
 
 	configName := fmt.Sprintf("%s-immich-config", immich.Name)
+	immichConfig := ptr.Deref(immich.Spec.Immich, mediav1alpha1.ImmichConfig{})
 
 	// Build effective configuration by merging base config with user config
 	effectiveConfig := r.buildEffectiveConfigMap(immich)
@@ -48,7 +49,7 @@ func (r *ImmichReconciler) reconcileImmichConfig(ctx context.Context, immich *me
 
 	labels := r.getLabels(immich, "config")
 
-	if immich.Spec.Immich.ConfigurationKind == "Secret" {
+	if immichConfig.ConfigurationKind == "Secret" {
 		secret := &corev1.Secret{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: corev1.SchemeGroupVersion.String(),
@@ -117,8 +118,9 @@ func (r *ImmichReconciler) buildEffectiveConfigMap(immich *mediav1alpha1.Immich)
 	r.applyMLConfigMap(immich, config)
 
 	// Then, merge user-provided configuration (user takes precedence)
-	if immich.Spec.Immich.Configuration != nil {
-		userConfig := r.configSpecToMap(immich.Spec.Immich.Configuration)
+	immichConfig := ptr.Deref(immich.Spec.Immich, mediav1alpha1.ImmichConfig{})
+	if immichConfig.Configuration != nil {
+		userConfig := r.configSpecToMap(immichConfig.Configuration)
 		config = r.deepMergeMap(config, userConfig)
 	}
 
@@ -128,12 +130,14 @@ func (r *ImmichReconciler) buildEffectiveConfigMap(immich *mediav1alpha1.Immich)
 // applyMLConfigMap applies machine learning configuration based on CR state.
 // Follows the Immich config structure: https://docs.immich.app/install/config-file/
 func (r *ImmichReconciler) applyMLConfigMap(immich *mediav1alpha1.Immich, config map[string]interface{}) {
+	mlSpec := ptr.Deref(immich.Spec.MachineLearning, mediav1alpha1.MachineLearningSpec{})
+
 	// Get the ML URL (built-in service URL, external URL, or empty if disabled)
 	mlURL := immich.GetMachineLearningURL()
 
 	// Determine if ML should be enabled
 	// ML is enabled if: built-in is enabled OR external URL is provided
-	mlEnabled := immich.IsMachineLearningEnabled() || immich.Spec.MachineLearning.URL != ""
+	mlEnabled := immich.IsMachineLearningEnabled() || mlSpec.URL != ""
 
 	// Build ML config map with only non-empty values
 	// Note: Immich uses "urls" (array) not "url" (string)
