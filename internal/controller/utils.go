@@ -23,38 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-
-	mediav1alpha1 "github.com/rm3l/immich-operator/api/v1alpha1"
 )
-
-// Standard Kubernetes labels
-const (
-	labelApp       = "app.kubernetes.io/name"
-	labelInstance  = "app.kubernetes.io/instance"
-	labelComponent = "app.kubernetes.io/component"
-	labelManagedBy = "app.kubernetes.io/managed-by"
-	labelPartOf    = "app.kubernetes.io/part-of"
-)
-
-// getLabels returns the standard labels for Immich components
-func (r *ImmichReconciler) getLabels(immich *mediav1alpha1.Immich, component string) map[string]string {
-	return map[string]string{
-		labelApp:       "immich",
-		labelInstance:  immich.Name,
-		labelComponent: component,
-		labelManagedBy: "immich-operator",
-		labelPartOf:    "immich",
-	}
-}
-
-// getSelectorLabels returns the selector labels for Immich components
-func (r *ImmichReconciler) getSelectorLabels(immich *mediav1alpha1.Immich, component string) map[string]string {
-	return map[string]string{
-		labelApp:       "immich",
-		labelInstance:  immich.Name,
-		labelComponent: component,
-	}
-}
 
 // mergeMaps merges two string maps, with override taking precedence
 func mergeMaps(base, override map[string]string) map[string]string {
