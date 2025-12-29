@@ -47,6 +47,7 @@ spec:
   - email: armel@rm3l.org
     name: Armel Soro
   maturity: alpha
+  minKubeVersion: 1.26.0
   provider:
     name: Armel Soro
     url: https://armel.soro.io
