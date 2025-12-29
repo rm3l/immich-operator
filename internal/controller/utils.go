@@ -42,6 +42,53 @@ func (r *ImmichReconciler) mergeMaps(base, override map[string]string) map[strin
 	return mergeMaps(base, override)
 }
 
+// deepMergeMap merges src into dst, with src taking precedence.
+func deepMergeMap(dst, src map[string]interface{}) map[string]interface{} {
+	result := make(map[string]interface{})
+
+	// Copy dst
+	for k, v := range dst {
+		result[k] = v
+	}
+
+	// Merge src (overrides dst)
+	for k, v := range src {
+		if v == nil {
+			continue
+		}
+		if srcMap, ok := v.(map[string]interface{}); ok {
+			if dstMap, ok := result[k].(map[string]interface{}); ok {
+				result[k] = deepMergeMap(dstMap, srcMap)
+			} else {
+				result[k] = srcMap
+			}
+		} else {
+			result[k] = v
+		}
+	}
+
+	return result
+}
+
+// Wrapper method on reconciler to maintain existing API
+func (r *ImmichReconciler) deepMergeMap(dst, src map[string]interface{}) map[string]interface{} {
+	return deepMergeMap(dst, src)
+}
+
+// removeNullValues recursively removes null values from a map.
+func removeNullValues(m map[string]interface{}) {
+	for key, value := range m {
+		if value == nil {
+			delete(m, key)
+		} else if nested, ok := value.(map[string]interface{}); ok {
+			removeNullValues(nested)
+			if len(nested) == 0 {
+				delete(m, key)
+			}
+		}
+	}
+}
+
 // createOrUpdate wraps controllerutil.CreateOrUpdate with logging
 func (r *ImmichReconciler) createOrUpdate(ctx context.Context, obj client.Object, mutate func() error) error {
 	log := logf.FromContext(ctx)
