@@ -61,7 +61,8 @@ func (r *ImmichReconciler) reconcilePostgres(ctx context.Context, immich *mediav
 	return nil
 }
 
-// reconcilePostgresCredentials creates a secret with PostgreSQL credentials if not provided
+// reconcilePostgresCredentials creates a secret with PostgreSQL credentials if not provided.
+// Note: The credentials secret does NOT have an owner reference to persist alongside the PVC.
 func (r *ImmichReconciler) reconcilePostgresCredentials(ctx context.Context, immich *mediav1alpha1.Immich) error {
 	log := logf.FromContext(ctx)
 
@@ -75,20 +76,12 @@ func (r *ImmichReconciler) reconcilePostgresCredentials(ctx context.Context, imm
 	secretName := fmt.Sprintf("%s-postgres-credentials", immich.Name)
 	labels := r.getLabels(immich, "postgres")
 
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
-			Namespace: immich.Namespace,
-			Labels:    labels,
-		},
-	}
-
-	// Check if secret already exists
+	// Check if secret already exists - reuse it if so
 	existing := &corev1.Secret{}
 	err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: immich.Namespace}, existing)
 	if err == nil {
-		// Secret exists, don't regenerate
-		log.V(1).Info("PostgreSQL credentials secret already exists", "name", secretName)
+		// Secret exists, reuse it (credentials must stay consistent with the database)
+		log.V(1).Info("PostgreSQL credentials secret already exists, reusing", "name", secretName)
 		return nil
 	}
 	if !apierrors.IsNotFound(err) {
@@ -101,17 +94,25 @@ func (r *ImmichReconciler) reconcilePostgresCredentials(ctx context.Context, imm
 		return fmt.Errorf("failed to generate PostgreSQL password: %w", err)
 	}
 
-	secret.Data = map[string][]byte{
-		"password": []byte(password),
-		"username": []byte(immich.GetPostgresUsername()),
-		"database": []byte(immich.GetPostgresDatabase()),
+	// Create secret without owner reference for data safety
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: immich.Namespace,
+			Labels:    labels,
+		},
+		Data: map[string][]byte{
+			"password": []byte(password),
+			"username": []byte(immich.GetPostgresUsername()),
+			"database": []byte(immich.GetPostgresDatabase()),
+		},
 	}
 
-	if err := controllerutil.SetControllerReference(immich, secret, r.Scheme); err != nil {
-		return err
-	}
+	// Note: We intentionally do NOT set owner reference here.
+	// This ensures the credentials persist when the Immich CR is deleted,
+	// staying consistent with the PostgreSQL PVC data.
 
-	log.Info("Creating PostgreSQL credentials secret", "name", secretName)
+	log.Info("Creating PostgreSQL credentials secret (no owner reference for data safety)", "name", secretName)
 	return r.Create(ctx, secret)
 }
 
