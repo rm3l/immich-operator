@@ -8,10 +8,6 @@ on:
     branches:
       - main
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 env:
   REGISTRY: ghcr.io
   # Use the repository owner/name (e.g., rm3l/immich-operator)
@@ -21,6 +17,9 @@ jobs:
   # Prepare: Extract version and determine tags
   prepare:
     runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-prepare
+      cancel-in-progress: true
     outputs:
       version: ${{ steps.version.outputs.version }}
       short_sha: ${{ steps.commit.outputs.short_sha }}
@@ -84,6 +83,9 @@ jobs:
             platform: linux/arm64
             suffix: arm64
     runs-on: ${{ matrix.runner }}
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-build-operator-${{ matrix.suffix }}
+      cancel-in-progress: true
     permissions:
       contents: read
       packages: write
@@ -126,6 +128,9 @@ jobs:
             platform: linux/arm64
             suffix: arm64
     runs-on: ${{ matrix.runner }}
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-build-bundle-${{ matrix.suffix }}
+      cancel-in-progress: true
     permissions:
       contents: read
       packages: write
@@ -169,6 +174,9 @@ jobs:
   merge-manifests:
     needs: [prepare, build-operator, build-bundle]
     runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-merge-manifests
+      cancel-in-progress: true
     permissions:
       contents: read
       packages: write
