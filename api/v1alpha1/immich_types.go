@@ -1009,11 +1009,13 @@ func GetImmichInitContainerImage() string {
 }
 
 // GetPostgresPVCName returns the name of the PVC for PostgreSQL data.
+// When using VolumeClaimTemplates, the PVC is named: <volumeClaimTemplate.name>-<statefulset.name>-<ordinal>
 func (i *Immich) GetPostgresPVCName() string {
 	if i.Spec.Postgres.Persistence.ExistingClaim != "" {
 		return i.Spec.Postgres.Persistence.ExistingClaim
 	}
-	return i.Name + "-postgres-data"
+	// VolumeClaimTemplate name is "data", StatefulSet name is "<immich.name>-postgres", ordinal is 0
+	return "data-" + i.Name + "-postgres-0"
 }
 
 // GetPostgresHost returns the hostname to connect to PostgreSQL.

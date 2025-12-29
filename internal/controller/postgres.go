@@ -43,12 +43,7 @@ func (r *ImmichReconciler) reconcilePostgres(ctx context.Context, immich *mediav
 		return err
 	}
 
-	// Create PostgreSQL PVC (if not using existing)
-	if err := r.reconcilePostgresPVC(ctx, immich); err != nil {
-		return err
-	}
-
-	// Create PostgreSQL StatefulSet
+	// Create PostgreSQL StatefulSet (with VolumeClaimTemplate for data persistence)
 	if err := r.reconcilePostgresStatefulSet(ctx, immich); err != nil {
 		return err
 	}
@@ -169,16 +164,51 @@ func (r *ImmichReconciler) reconcilePostgresStatefulSet(ctx context.Context, imm
 		},
 	}
 
-	// Build volumes
-	volumes := []corev1.Volume{
-		{
-			Name: "data",
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: immich.GetPostgresPVCName(),
+	// Build volumes - only needed if using an existing claim
+	var volumes []corev1.Volume
+	if immich.Spec.Postgres.Persistence.ExistingClaim != "" {
+		volumes = []corev1.Volume{
+			{
+				Name: "data",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: immich.Spec.Postgres.Persistence.ExistingClaim,
+					},
 				},
 			},
-		},
+		}
+	}
+
+	// Build VolumeClaimTemplate for automatic PVC management (if not using existing claim)
+	var volumeClaimTemplates []corev1.PersistentVolumeClaim
+	if immich.Spec.Postgres.Persistence.ExistingClaim == "" {
+		size := immich.Spec.Postgres.Persistence.Size
+		if size.IsZero() {
+			size = resource.MustParse("10Gi")
+		}
+
+		accessModes := immich.Spec.Postgres.Persistence.AccessModes
+		if len(accessModes) == 0 {
+			accessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
+		}
+
+		volumeClaimTemplates = []corev1.PersistentVolumeClaim{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "data",
+					Labels: labels,
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					AccessModes:      accessModes,
+					StorageClassName: immich.Spec.Postgres.Persistence.StorageClass,
+					Resources: corev1.VolumeResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: size,
+						},
+					},
+				},
+			},
+		}
 	}
 
 	sts := &appsv1.StatefulSet{
@@ -200,7 +230,9 @@ func (r *ImmichReconciler) reconcilePostgresStatefulSet(ctx context.Context, imm
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
-			ServiceName: name,
+			ServiceName:          name,
+			VolumeClaimTemplates: volumeClaimTemplates,
+			// PVCs created by VolumeClaimTemplates are retained by default when StatefulSet is deleted
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      labels,
@@ -302,66 +334,4 @@ func (r *ImmichReconciler) reconcilePostgresService(ctx context.Context, immich 
 	}
 
 	return nil
-}
-
-// reconcilePostgresPVC creates the PVC for PostgreSQL data if needed
-// reconcilePostgresPVC creates the PVC for PostgreSQL data if needed.
-// Note: PostgreSQL PVCs do NOT have an owner reference to allow data persistence
-// across Immich CR deletions and recreations.
-func (r *ImmichReconciler) reconcilePostgresPVC(ctx context.Context, immich *mediav1alpha1.Immich) error {
-	log := logf.FromContext(ctx)
-
-	if immich.Spec.Postgres.Persistence.ExistingClaim != "" {
-		return nil // Using existing PVC
-	}
-
-	name := immich.GetPostgresPVCName()
-	labels := r.getLabels(immich, "postgres")
-
-	// Check if PVC already exists - reuse it if so
-	existing := &corev1.PersistentVolumeClaim{}
-	err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: immich.Namespace}, existing)
-	if err == nil {
-		// PVC exists, reuse it (don't update - PVCs are mostly immutable)
-		log.V(1).Info("PostgreSQL PVC already exists, reusing", "name", name)
-		return nil
-	}
-	if !apierrors.IsNotFound(err) {
-		return err
-	}
-
-	size := immich.Spec.Postgres.Persistence.Size
-	if size.IsZero() {
-		size = resource.MustParse("10Gi")
-	}
-
-	accessModes := immich.Spec.Postgres.Persistence.AccessModes
-	if len(accessModes) == 0 {
-		accessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
-	}
-
-	// Create new PVC (without owner reference for data safety)
-	pvc := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: immich.Namespace,
-			Labels:    labels,
-		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes:      accessModes,
-			StorageClassName: immich.Spec.Postgres.Persistence.StorageClass,
-			Resources: corev1.VolumeResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: size,
-				},
-			},
-		},
-	}
-
-	// Note: We intentionally do NOT set owner reference here.
-	// This ensures the PVC persists when the Immich CR is deleted,
-	// protecting database data and allowing reuse on CR recreation.
-
-	log.Info("Creating PostgreSQL PVC (no owner reference for data safety)", "name", name, "size", size.String())
-	return r.Create(ctx, pvc)
 }

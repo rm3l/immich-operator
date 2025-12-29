@@ -174,7 +174,7 @@ The operator deploys PostgreSQL by default with auto-generated credentials. Set 
 
 When using built-in PostgreSQL, credentials are automatically generated and stored in a secret named `<immich-name>-postgres-credentials`.
 
-> **Data Safety:** The PostgreSQL PVC does **NOT** have an owner reference, meaning it will **persist** when the Immich CR is deleted. This protects your database from accidental deletion. When you recreate the CR with the same name, the existing PVC will be reused automatically. To delete the PVC, you must do so manually.
+> **Data Safety:** PostgreSQL uses a StatefulSet with VolumeClaimTemplates, meaning the PVC (`data-<immich-name>-postgres-0`) will **persist** when the Immich CR is deleted. This protects your database from accidental deletion. When you recreate the CR with the same name, the existing PVC will be reused automatically. To delete the PVC, you must do so manually.
 
 | Field | Description | Default |
 |-------|-------------|---------|
