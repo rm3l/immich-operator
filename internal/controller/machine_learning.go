@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	mediav1alpha1 "github.com/rm3l/immich-operator/api/v1alpha1"
@@ -60,6 +59,7 @@ func (r *ImmichReconciler) reconcileMachineLearning(ctx context.Context, immich 
 	return nil
 }
 
+// reconcileMLDeployment creates or updates the ML Deployment using server-side apply
 func (r *ImmichReconciler) reconcileMLDeployment(ctx context.Context, immich *mediav1alpha1.Immich) error {
 	name := fmt.Sprintf("%s-machine-learning", immich.Name)
 	labels := r.getLabels(immich, "machine-learning")
@@ -78,19 +78,26 @@ func (r *ImmichReconciler) reconcileMLDeployment(ctx context.Context, immich *me
 	env = append(env, immich.Spec.MachineLearning.Env...)
 
 	deployment := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+			Kind:       "Deployment",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: immich.Namespace,
 			Labels:    labels,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         immich.APIVersion,
+					Kind:               immich.Kind,
+					Name:               immich.Name,
+					UID:                immich.UID,
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
 		},
-	}
-
-	if err := controllerutil.SetControllerReference(immich, deployment, r.Scheme); err != nil {
-		return err
-	}
-
-	return r.createOrUpdate(ctx, deployment, func() error {
-		deployment.Spec = appsv1.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: ptr.To(replicas),
 			Strategy: appsv1.DeploymentStrategy{
 				Type: appsv1.RollingUpdateDeploymentStrategyType,
@@ -167,9 +174,10 @@ func (r *ImmichReconciler) reconcileMLDeployment(ctx context.Context, immich *me
 					Volumes: r.getMLVolumes(immich),
 				},
 			},
-		}
-		return nil
-	})
+		},
+	}
+
+	return r.apply(ctx, deployment)
 }
 
 func (r *ImmichReconciler) getMLVolumeMounts(_ *mediav1alpha1.Immich) []corev1.VolumeMount {
@@ -211,25 +219,33 @@ func (r *ImmichReconciler) getMLVolumes(immich *mediav1alpha1.Immich) []corev1.V
 	}
 }
 
+// reconcileMLService creates or updates the ML Service using server-side apply
 func (r *ImmichReconciler) reconcileMLService(ctx context.Context, immich *mediav1alpha1.Immich) error {
 	name := fmt.Sprintf("%s-machine-learning", immich.Name)
 	labels := r.getLabels(immich, "machine-learning")
 	selectorLabels := r.getSelectorLabels(immich, "machine-learning")
 
 	service := &corev1.Service{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: corev1.SchemeGroupVersion.String(),
+			Kind:       "Service",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: immich.Namespace,
 			Labels:    labels,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         immich.APIVersion,
+					Kind:               immich.Kind,
+					Name:               immich.Name,
+					UID:                immich.UID,
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
 		},
-	}
-
-	if err := controllerutil.SetControllerReference(immich, service, r.Scheme); err != nil {
-		return err
-	}
-
-	return r.createOrUpdate(ctx, service, func() error {
-		service.Spec = corev1.ServiceSpec{
+		Spec: corev1.ServiceSpec{
 			Type:     corev1.ServiceTypeClusterIP,
 			Selector: selectorLabels,
 			Ports: []corev1.ServicePort{
@@ -240,9 +256,10 @@ func (r *ImmichReconciler) reconcileMLService(ctx context.Context, immich *media
 					Protocol:   corev1.ProtocolTCP,
 				},
 			},
-		}
-		return nil
-	})
+		},
+	}
+
+	return r.apply(ctx, service)
 }
 
 func (r *ImmichReconciler) reconcileMLPVC(ctx context.Context, immich *mediav1alpha1.Immich) error {
@@ -252,6 +269,17 @@ func (r *ImmichReconciler) reconcileMLPVC(ctx context.Context, immich *mediav1al
 
 	name := fmt.Sprintf("%s-ml-cache", immich.Name)
 	labels := r.getLabels(immich, "machine-learning")
+
+	// Check if PVC already exists - PVCs are mostly immutable
+	existing := &corev1.PersistentVolumeClaim{}
+	err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: immich.Namespace}, existing)
+	if err == nil {
+		// PVC exists, don't update
+		return nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return err
+	}
 
 	size := immich.Spec.MachineLearning.Persistence.Size
 	if size.IsZero() {
@@ -263,36 +291,34 @@ func (r *ImmichReconciler) reconcileMLPVC(ctx context.Context, immich *mediav1al
 		accessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
 	}
 
+	// Create new PVC with owner reference (ML cache is not as critical as library/postgres)
 	pvc := &corev1.PersistentVolumeClaim{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: corev1.SchemeGroupVersion.String(),
+			Kind:       "PersistentVolumeClaim",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: immich.Namespace,
 			Labels:    labels,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         immich.APIVersion,
+					Kind:               immich.Kind,
+					Name:               immich.Name,
+					UID:                immich.UID,
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
 		},
-	}
-
-	if err := controllerutil.SetControllerReference(immich, pvc, r.Scheme); err != nil {
-		return err
-	}
-
-	// Check if PVC already exists - we can't update it
-	existing := &corev1.PersistentVolumeClaim{}
-	err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: immich.Namespace}, existing)
-	if err == nil {
-		// PVC exists, don't update
-		return nil
-	}
-	if !apierrors.IsNotFound(err) {
-		return err
-	}
-
-	// Create new PVC
-	pvc.Spec = corev1.PersistentVolumeClaimSpec{
-		AccessModes:      accessModes,
-		StorageClassName: immich.Spec.MachineLearning.Persistence.StorageClass,
-		Resources: corev1.VolumeResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceStorage: size,
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes:      accessModes,
+			StorageClassName: immich.Spec.MachineLearning.Persistence.StorageClass,
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: size,
+				},
 			},
 		},
 	}

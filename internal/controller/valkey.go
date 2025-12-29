@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	mediav1alpha1 "github.com/rm3l/immich-operator/api/v1alpha1"
@@ -38,6 +37,13 @@ import (
 func (r *ImmichReconciler) reconcileValkey(ctx context.Context, immich *mediav1alpha1.Immich) error {
 	log := logf.FromContext(ctx)
 	log.V(1).Info("Reconciling Valkey")
+
+	// Create Valkey PVC if persistence is enabled (must be created before deployment)
+	if immich.Spec.Valkey.Persistence.Enabled != nil && *immich.Spec.Valkey.Persistence.Enabled {
+		if err := r.reconcileValkeyPVC(ctx, immich); err != nil {
+			return err
+		}
+	}
 
 	// Create Valkey Deployment
 	if err := r.reconcileValkeyDeployment(ctx, immich); err != nil {
@@ -49,35 +55,36 @@ func (r *ImmichReconciler) reconcileValkey(ctx context.Context, immich *mediav1a
 		return err
 	}
 
-	// Create Valkey PVC if persistence is enabled
-	if immich.Spec.Valkey.Persistence.Enabled != nil && *immich.Spec.Valkey.Persistence.Enabled {
-		if err := r.reconcileValkeyPVC(ctx, immich); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
+// reconcileValkeyDeployment creates or updates the Valkey Deployment using server-side apply
 func (r *ImmichReconciler) reconcileValkeyDeployment(ctx context.Context, immich *mediav1alpha1.Immich) error {
 	name := fmt.Sprintf("%s-valkey", immich.Name)
 	labels := r.getLabels(immich, "valkey")
 	selectorLabels := r.getSelectorLabels(immich, "valkey")
 
 	deployment := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+			Kind:       "Deployment",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: immich.Namespace,
 			Labels:    labels,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         immich.APIVersion,
+					Kind:               immich.Kind,
+					Name:               immich.Name,
+					UID:                immich.UID,
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
 		},
-	}
-
-	if err := controllerutil.SetControllerReference(immich, deployment, r.Scheme); err != nil {
-		return err
-	}
-
-	return r.createOrUpdate(ctx, deployment, func() error {
-		deployment.Spec = appsv1.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: ptr.To(int32(1)),
 			Strategy: appsv1.DeploymentStrategy{
 				Type: appsv1.RecreateDeploymentStrategyType,
@@ -138,9 +145,10 @@ func (r *ImmichReconciler) reconcileValkeyDeployment(ctx context.Context, immich
 					Volumes: r.getValkeyVolumes(immich),
 				},
 			},
-		}
-		return nil
-	})
+		},
+	}
+
+	return r.apply(ctx, deployment)
 }
 
 func (r *ImmichReconciler) getValkeyVolumeMounts(immich *mediav1alpha1.Immich) []corev1.VolumeMount {
@@ -182,25 +190,33 @@ func (r *ImmichReconciler) getValkeyVolumes(immich *mediav1alpha1.Immich) []core
 	}
 }
 
+// reconcileValkeyService creates or updates the Valkey Service using server-side apply
 func (r *ImmichReconciler) reconcileValkeyService(ctx context.Context, immich *mediav1alpha1.Immich) error {
 	name := fmt.Sprintf("%s-valkey", immich.Name)
 	labels := r.getLabels(immich, "valkey")
 	selectorLabels := r.getSelectorLabels(immich, "valkey")
 
 	service := &corev1.Service{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: corev1.SchemeGroupVersion.String(),
+			Kind:       "Service",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: immich.Namespace,
 			Labels:    labels,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         immich.APIVersion,
+					Kind:               immich.Kind,
+					Name:               immich.Name,
+					UID:                immich.UID,
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
 		},
-	}
-
-	if err := controllerutil.SetControllerReference(immich, service, r.Scheme); err != nil {
-		return err
-	}
-
-	return r.createOrUpdate(ctx, service, func() error {
-		service.Spec = corev1.ServiceSpec{
+		Spec: corev1.ServiceSpec{
 			Type:     corev1.ServiceTypeClusterIP,
 			Selector: selectorLabels,
 			Ports: []corev1.ServicePort{
@@ -211,9 +227,10 @@ func (r *ImmichReconciler) reconcileValkeyService(ctx context.Context, immich *m
 					Protocol:   corev1.ProtocolTCP,
 				},
 			},
-		}
-		return nil
-	})
+		},
+	}
+
+	return r.apply(ctx, service)
 }
 
 func (r *ImmichReconciler) reconcileValkeyPVC(ctx context.Context, immich *mediav1alpha1.Immich) error {
@@ -223,6 +240,17 @@ func (r *ImmichReconciler) reconcileValkeyPVC(ctx context.Context, immich *media
 
 	name := fmt.Sprintf("%s-valkey-data", immich.Name)
 	labels := r.getLabels(immich, "valkey")
+
+	// Check if PVC already exists - PVCs are mostly immutable
+	existing := &corev1.PersistentVolumeClaim{}
+	err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: immich.Namespace}, existing)
+	if err == nil {
+		// PVC exists, don't update
+		return nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return err
+	}
 
 	size := immich.Spec.Valkey.Persistence.Size
 	if size.IsZero() {
@@ -234,36 +262,34 @@ func (r *ImmichReconciler) reconcileValkeyPVC(ctx context.Context, immich *media
 		accessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
 	}
 
+	// Create new PVC with owner reference (Valkey data is not as critical as Postgres)
 	pvc := &corev1.PersistentVolumeClaim{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: corev1.SchemeGroupVersion.String(),
+			Kind:       "PersistentVolumeClaim",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: immich.Namespace,
 			Labels:    labels,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         immich.APIVersion,
+					Kind:               immich.Kind,
+					Name:               immich.Name,
+					UID:                immich.UID,
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
 		},
-	}
-
-	if err := controllerutil.SetControllerReference(immich, pvc, r.Scheme); err != nil {
-		return err
-	}
-
-	// Check if PVC already exists - we can't update it
-	existing := &corev1.PersistentVolumeClaim{}
-	err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: immich.Namespace}, existing)
-	if err == nil {
-		// PVC exists, don't update
-		return nil
-	}
-	if !apierrors.IsNotFound(err) {
-		return err
-	}
-
-	// Create new PVC
-	pvc.Spec = corev1.PersistentVolumeClaimSpec{
-		AccessModes:      accessModes,
-		StorageClassName: immich.Spec.Valkey.Persistence.StorageClass,
-		Resources: corev1.VolumeResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceStorage: size,
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes:      accessModes,
+			StorageClassName: immich.Spec.Valkey.Persistence.StorageClass,
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: size,
+				},
 			},
 		},
 	}

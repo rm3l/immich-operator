@@ -22,14 +22,14 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"k8s.io/utils/ptr"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	mediav1alpha1 "github.com/rm3l/immich-operator/api/v1alpha1"
 	"gopkg.in/yaml.v3"
 )
 
-// reconcileImmichConfig creates or updates the Immich configuration ConfigMap or Secret.
+// reconcileImmichConfig creates or updates the Immich configuration ConfigMap or Secret using server-side apply.
 // It builds a base configuration from CR state and merges it with user-provided configuration.
 func (r *ImmichReconciler) reconcileImmichConfig(ctx context.Context, immich *mediav1alpha1.Immich) error {
 	log := logf.FromContext(ctx)
@@ -50,10 +50,24 @@ func (r *ImmichReconciler) reconcileImmichConfig(ctx context.Context, immich *me
 
 	if immich.Spec.Immich.ConfigurationKind == "Secret" {
 		secret := &corev1.Secret{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: corev1.SchemeGroupVersion.String(),
+				Kind:       "Secret",
+			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      configName,
 				Namespace: immich.Namespace,
 				Labels:    labels,
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion:         immich.APIVersion,
+						Kind:               immich.Kind,
+						Name:               immich.Name,
+						UID:                immich.UID,
+						Controller:         ptr.To(true),
+						BlockOwnerDeletion: ptr.To(true),
+					},
+				},
 			},
 			Type: corev1.SecretTypeOpaque,
 			StringData: map[string]string{
@@ -61,40 +75,36 @@ func (r *ImmichReconciler) reconcileImmichConfig(ctx context.Context, immich *me
 			},
 		}
 
-		if err := controllerutil.SetControllerReference(immich, secret, r.Scheme); err != nil {
-			return err
-		}
-
-		return r.createOrUpdate(ctx, secret, func() error {
-			secret.StringData = map[string]string{
-				"immich-config.yaml": string(configData),
-			}
-			return nil
-		})
+		return r.apply(ctx, secret)
 	}
 
 	// Default to ConfigMap
 	configMap := &corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: corev1.SchemeGroupVersion.String(),
+			Kind:       "ConfigMap",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      configName,
 			Namespace: immich.Namespace,
 			Labels:    labels,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         immich.APIVersion,
+					Kind:               immich.Kind,
+					Name:               immich.Name,
+					UID:                immich.UID,
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
 		},
 		Data: map[string]string{
 			"immich-config.yaml": string(configData),
 		},
 	}
 
-	if err := controllerutil.SetControllerReference(immich, configMap, r.Scheme); err != nil {
-		return err
-	}
-
-	return r.createOrUpdate(ctx, configMap, func() error {
-		configMap.Data = map[string]string{
-			"immich-config.yaml": string(configData),
-		}
-		return nil
-	})
+	return r.apply(ctx, configMap)
 }
 
 // buildEffectiveConfigMap builds the effective Immich configuration as a map.

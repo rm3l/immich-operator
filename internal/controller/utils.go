@@ -21,9 +21,11 @@ import (
 	"crypto/rand"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+// FieldManager is the field manager name used for server-side apply
+const FieldManager = "immich-operator"
 
 // mergeMaps merges two string maps, with override taking precedence
 func mergeMaps(base, override map[string]string) map[string]string {
@@ -89,22 +91,21 @@ func removeNullValues(m map[string]interface{}) {
 	}
 }
 
-// createOrUpdate wraps controllerutil.CreateOrUpdate with logging
-func (r *ImmichReconciler) createOrUpdate(ctx context.Context, obj client.Object, mutate func() error) error {
+// apply uses server-side apply to create or update a resource.
+// The object must have its GVK set (TypeMeta populated).
+// Server-side apply provides:
+// - Better conflict resolution with field ownership tracking
+// - No need to read-before-write (eliminates race conditions)
+// - Declarative updates where only specified fields are managed
+func (r *ImmichReconciler) apply(ctx context.Context, obj client.Object) error {
 	log := logf.FromContext(ctx)
 
-	result, err := controllerutil.CreateOrUpdate(ctx, r.Client, obj, mutate)
+	err := r.Patch(ctx, obj, client.Apply, client.FieldOwner(FieldManager), client.ForceOwnership)
 	if err != nil {
 		return err
 	}
 
-	switch result {
-	case controllerutil.OperationResultCreated:
-		log.Info("Created resource", "kind", obj.GetObjectKind().GroupVersionKind().Kind, "name", obj.GetName())
-	case controllerutil.OperationResultUpdated:
-		log.V(1).Info("Updated resource", "kind", obj.GetObjectKind().GroupVersionKind().Kind, "name", obj.GetName())
-	}
-
+	log.V(1).Info("Applied resource", "kind", obj.GetObjectKind().GroupVersionKind().Kind, "name", obj.GetName())
 	return nil
 }
 

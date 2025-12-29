@@ -26,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	mediav1alpha1 "github.com/rm3l/immich-operator/api/v1alpha1"
@@ -57,6 +56,7 @@ func (r *ImmichReconciler) reconcileServer(ctx context.Context, immich *mediav1a
 	return nil
 }
 
+// reconcileServerDeployment creates or updates the Server Deployment using server-side apply
 func (r *ImmichReconciler) reconcileServerDeployment(ctx context.Context, immich *mediav1alpha1.Immich) error {
 	name := fmt.Sprintf("%s-server", immich.Name)
 	labels := r.getLabels(immich, "server")
@@ -81,18 +81,6 @@ func (r *ImmichReconciler) reconcileServerDeployment(ctx context.Context, immich
 		annotations[k] = v
 	}
 
-	deployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: immich.Namespace,
-			Labels:    labels,
-		},
-	}
-
-	if err := controllerutil.SetControllerReference(immich, deployment, r.Scheme); err != nil {
-		return err
-	}
-
 	// Build container ports
 	ports := []corev1.ContainerPort{
 		{
@@ -109,8 +97,27 @@ func (r *ImmichReconciler) reconcileServerDeployment(ctx context.Context, immich
 		)
 	}
 
-	return r.createOrUpdate(ctx, deployment, func() error {
-		deployment.Spec = appsv1.DeploymentSpec{
+	deployment := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+			Kind:       "Deployment",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: immich.Namespace,
+			Labels:    labels,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         immich.APIVersion,
+					Kind:               immich.Kind,
+					Name:               immich.Name,
+					UID:                immich.UID,
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
+		},
+		Spec: appsv1.DeploymentSpec{
 			Replicas: ptr.To(replicas),
 			Strategy: appsv1.DeploymentStrategy{
 				Type: appsv1.RollingUpdateDeploymentStrategyType,
@@ -182,9 +189,10 @@ func (r *ImmichReconciler) reconcileServerDeployment(ctx context.Context, immich
 					Volumes: volumes,
 				},
 			},
-		}
-		return nil
-	})
+		},
+	}
+
+	return r.apply(ctx, deployment)
 }
 
 func (r *ImmichReconciler) getServerEnv(immich *mediav1alpha1.Immich) []corev1.EnvVar {
@@ -417,22 +425,11 @@ func (r *ImmichReconciler) getServerVolumes(immich *mediav1alpha1.Immich) []core
 	return volumes
 }
 
+// reconcileServerService creates or updates the Server Service using server-side apply
 func (r *ImmichReconciler) reconcileServerService(ctx context.Context, immich *mediav1alpha1.Immich) error {
 	name := fmt.Sprintf("%s-server", immich.Name)
 	labels := r.getLabels(immich, "server")
 	selectorLabels := r.getSelectorLabels(immich, "server")
-
-	service := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: immich.Namespace,
-			Labels:    labels,
-		},
-	}
-
-	if err := controllerutil.SetControllerReference(immich, service, r.Scheme); err != nil {
-		return err
-	}
 
 	ports := []corev1.ServicePort{
 		{
@@ -450,89 +447,118 @@ func (r *ImmichReconciler) reconcileServerService(ctx context.Context, immich *m
 		)
 	}
 
-	return r.createOrUpdate(ctx, service, func() error {
-		service.Spec = corev1.ServiceSpec{
+	service := &corev1.Service{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: corev1.SchemeGroupVersion.String(),
+			Kind:       "Service",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: immich.Namespace,
+			Labels:    labels,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         immich.APIVersion,
+					Kind:               immich.Kind,
+					Name:               immich.Name,
+					UID:                immich.UID,
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
+		},
+		Spec: corev1.ServiceSpec{
 			Type:     corev1.ServiceTypeClusterIP,
 			Selector: selectorLabels,
 			Ports:    ports,
-		}
-		return nil
-	})
+		},
+	}
+
+	return r.apply(ctx, service)
 }
 
+// reconcileServerIngress creates or updates the Server Ingress using server-side apply
 func (r *ImmichReconciler) reconcileServerIngress(ctx context.Context, immich *mediav1alpha1.Immich) error {
 	name := fmt.Sprintf("%s-server", immich.Name)
 	labels := r.getLabels(immich, "server")
 
+	// Build rules
+	var rules []networkingv1.IngressRule
+	for _, host := range immich.Spec.Server.Ingress.Hosts {
+		var paths []networkingv1.HTTPIngressPath
+		for _, p := range host.Paths {
+			var pathType networkingv1.PathType
+			switch p.PathType {
+			case "Exact":
+				pathType = networkingv1.PathTypeExact
+			case "ImplementationSpecific":
+				pathType = networkingv1.PathTypeImplementationSpecific
+			default:
+				pathType = networkingv1.PathTypePrefix
+			}
+			path := p.Path
+			if path == "" {
+				path = "/"
+			}
+			paths = append(paths, networkingv1.HTTPIngressPath{
+				Path:     path,
+				PathType: &pathType,
+				Backend: networkingv1.IngressBackend{
+					Service: &networkingv1.IngressServiceBackend{
+						Name: name,
+						Port: networkingv1.ServiceBackendPort{
+							Name: "http",
+						},
+					},
+				},
+			})
+		}
+		rules = append(rules, networkingv1.IngressRule{
+			Host: host.Host,
+			IngressRuleValue: networkingv1.IngressRuleValue{
+				HTTP: &networkingv1.HTTPIngressRuleValue{
+					Paths: paths,
+				},
+			},
+		})
+	}
+
+	// Build TLS
+	var tls []networkingv1.IngressTLS
+	for _, t := range immich.Spec.Server.Ingress.TLS {
+		tls = append(tls, networkingv1.IngressTLS{
+			Hosts:      t.Hosts,
+			SecretName: t.SecretName,
+		})
+	}
+
 	ingress := &networkingv1.Ingress{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: networkingv1.SchemeGroupVersion.String(),
+			Kind:       "Ingress",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Namespace:   immich.Namespace,
 			Labels:      labels,
 			Annotations: immich.Spec.Server.Ingress.Annotations,
-		},
-	}
-
-	if err := controllerutil.SetControllerReference(immich, ingress, r.Scheme); err != nil {
-		return err
-	}
-
-	return r.createOrUpdate(ctx, ingress, func() error {
-		// Build rules
-		var rules []networkingv1.IngressRule
-		for _, host := range immich.Spec.Server.Ingress.Hosts {
-			var paths []networkingv1.HTTPIngressPath
-			for _, p := range host.Paths {
-				var pathType networkingv1.PathType
-				switch p.PathType {
-				case "Exact":
-					pathType = networkingv1.PathTypeExact
-				case "ImplementationSpecific":
-					pathType = networkingv1.PathTypeImplementationSpecific
-				default:
-					pathType = networkingv1.PathTypePrefix
-				}
-				path := p.Path
-				if path == "" {
-					path = "/"
-				}
-				paths = append(paths, networkingv1.HTTPIngressPath{
-					Path:     path,
-					PathType: &pathType,
-					Backend: networkingv1.IngressBackend{
-						Service: &networkingv1.IngressServiceBackend{
-							Name: name,
-							Port: networkingv1.ServiceBackendPort{
-								Name: "http",
-							},
-						},
-					},
-				})
-			}
-			rules = append(rules, networkingv1.IngressRule{
-				Host: host.Host,
-				IngressRuleValue: networkingv1.IngressRuleValue{
-					HTTP: &networkingv1.HTTPIngressRuleValue{
-						Paths: paths,
-					},
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         immich.APIVersion,
+					Kind:               immich.Kind,
+					Name:               immich.Name,
+					UID:                immich.UID,
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
 				},
-			})
-		}
-
-		// Build TLS
-		var tls []networkingv1.IngressTLS
-		for _, t := range immich.Spec.Server.Ingress.TLS {
-			tls = append(tls, networkingv1.IngressTLS{
-				Hosts:      t.Hosts,
-				SecretName: t.SecretName,
-			})
-		}
-
-		ingress.Spec = networkingv1.IngressSpec{
+			},
+		},
+		Spec: networkingv1.IngressSpec{
 			IngressClassName: immich.Spec.Server.Ingress.IngressClassName,
 			Rules:            rules,
 			TLS:              tls,
-		}
-		return nil
-	})
+		},
+	}
+
+	return r.apply(ctx, ingress)
 }

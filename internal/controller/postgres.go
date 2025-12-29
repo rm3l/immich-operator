@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"k8s.io/utils/ptr"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	mediav1alpha1 "github.com/rm3l/immich-operator/api/v1alpha1"
@@ -124,9 +124,8 @@ func (r *ImmichReconciler) getPostgresPasswordSecretRef(immich *mediav1alpha1.Im
 	}
 }
 
-// reconcilePostgresStatefulSet creates or updates the PostgreSQL StatefulSet
+// reconcilePostgresStatefulSet creates or updates the PostgreSQL StatefulSet using server-side apply
 func (r *ImmichReconciler) reconcilePostgresStatefulSet(ctx context.Context, immich *mediav1alpha1.Immich) error {
-	log := logf.FromContext(ctx)
 	name := fmt.Sprintf("%s-postgres", immich.Name)
 	labels := r.getLabels(immich, "postgres")
 
@@ -212,27 +211,32 @@ func (r *ImmichReconciler) reconcilePostgresStatefulSet(ctx context.Context, imm
 	}
 
 	sts := &appsv1.StatefulSet{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+			Kind:       "StatefulSet",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: immich.Namespace,
 			Labels:    labels,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         immich.APIVersion,
+					Kind:               immich.Kind,
+					Name:               immich.Name,
+					UID:                immich.UID,
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
 		},
-	}
-
-	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, sts, func() error {
-		if err := controllerutil.SetControllerReference(immich, sts, r.Scheme); err != nil {
-			return err
-		}
-
-		replicas := int32(1)
-		sts.Spec = appsv1.StatefulSetSpec{
-			Replicas: &replicas,
+		Spec: appsv1.StatefulSetSpec{
+			Replicas: ptr.To(int32(1)),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
 			ServiceName:          name,
 			VolumeClaimTemplates: volumeClaimTemplates,
-			// PVCs created by VolumeClaimTemplates are retained by default when StatefulSet is deleted
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      labels,
@@ -283,38 +287,38 @@ func (r *ImmichReconciler) reconcilePostgresStatefulSet(ctx context.Context, imm
 					},
 				},
 			},
-		}
-		return nil
-	})
-
-	if err != nil {
-		log.Error(err, "Failed to create/update PostgreSQL StatefulSet")
-		return err
+		},
 	}
 
-	return nil
+	return r.apply(ctx, sts)
 }
 
-// reconcilePostgresService creates or updates the PostgreSQL Service
+// reconcilePostgresService creates or updates the PostgreSQL Service using server-side apply
 func (r *ImmichReconciler) reconcilePostgresService(ctx context.Context, immich *mediav1alpha1.Immich) error {
-	log := logf.FromContext(ctx)
 	name := fmt.Sprintf("%s-postgres", immich.Name)
 	labels := r.getLabels(immich, "postgres")
 
 	svc := &corev1.Service{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: corev1.SchemeGroupVersion.String(),
+			Kind:       "Service",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: immich.Namespace,
 			Labels:    labels,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         immich.APIVersion,
+					Kind:               immich.Kind,
+					Name:               immich.Name,
+					UID:                immich.UID,
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
 		},
-	}
-
-	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, svc, func() error {
-		if err := controllerutil.SetControllerReference(immich, svc, r.Scheme); err != nil {
-			return err
-		}
-
-		svc.Spec = corev1.ServiceSpec{
+		Spec: corev1.ServiceSpec{
 			Selector: labels,
 			Ports: []corev1.ServicePort{
 				{
@@ -324,14 +328,8 @@ func (r *ImmichReconciler) reconcilePostgresService(ctx context.Context, immich 
 					Protocol:   corev1.ProtocolTCP,
 				},
 			},
-		}
-		return nil
-	})
-
-	if err != nil {
-		log.Error(err, "Failed to create/update PostgreSQL Service")
-		return err
+		},
 	}
 
-	return nil
+	return r.apply(ctx, svc)
 }
