@@ -34,19 +34,19 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// reconcileImmichConfig creates or updates the Immich configuration ConfigMap or Secret
+// reconcileImmichConfig creates or updates the Immich configuration ConfigMap or Secret.
+// It builds a base configuration from CR state and merges it with user-provided configuration.
 func (r *ImmichReconciler) reconcileImmichConfig(ctx context.Context, immich *mediav1alpha1.Immich) error {
 	log := logf.FromContext(ctx)
-
-	if immich.Spec.Immich.Configuration == nil {
-		log.V(1).Info("No Immich configuration specified, skipping ConfigMap/Secret creation")
-		return nil
-	}
+	log.V(1).Info("Reconciling Immich configuration")
 
 	configName := fmt.Sprintf("%s-immich-config", immich.Name)
 
+	// Build effective configuration by merging base config with user config
+	effectiveConfig := r.buildEffectiveConfig(immich)
+
 	// Convert configuration to YAML
-	configData, err := yaml.Marshal(immich.Spec.Immich.Configuration)
+	configData, err := yaml.Marshal(effectiveConfig)
 	if err != nil {
 		return fmt.Errorf("failed to marshal immich configuration: %w", err)
 	}
@@ -100,6 +100,57 @@ func (r *ImmichReconciler) reconcileImmichConfig(ctx context.Context, immich *me
 		}
 		return nil
 	})
+}
+
+// buildEffectiveConfig builds the effective Immich configuration by merging
+// operator-derived settings with user-provided configuration.
+// User configuration takes precedence over operator-derived settings.
+func (r *ImmichReconciler) buildEffectiveConfig(immich *mediav1alpha1.Immich) *mediav1alpha1.ConfigurationSpec {
+	// Start with user-provided config or empty config
+	var config *mediav1alpha1.ConfigurationSpec
+	if immich.Spec.Immich.Configuration != nil {
+		// Deep copy user config to avoid modifying the original
+		config = immich.Spec.Immich.Configuration.DeepCopy()
+	} else {
+		config = &mediav1alpha1.ConfigurationSpec{}
+	}
+
+	// Apply operator-derived ML settings if user hasn't explicitly configured them
+	r.applyMLConfig(immich, config)
+
+	return config
+}
+
+// applyMLConfig applies machine learning configuration based on CR state.
+// User-provided ML config takes precedence.
+func (r *ImmichReconciler) applyMLConfig(immich *mediav1alpha1.Immich, config *mediav1alpha1.ConfigurationSpec) {
+	// Get the ML URL (built-in service URL, external URL, or empty if disabled)
+	mlURL := immich.GetMachineLearningURL()
+
+	// Determine if ML should be enabled
+	// ML is enabled if: built-in is enabled OR external URL is provided
+	mlEnabled := immich.IsMachineLearningEnabled() || immich.Spec.MachineLearning.URL != ""
+
+	// Only set ML config if user hasn't provided their own
+	if config.MachineLearning == nil {
+		config.MachineLearning = &mediav1alpha1.MachineLearningConfig{
+			Enabled: mlEnabled,
+		}
+		if mlURL != "" {
+			config.MachineLearning.URL = mlURL
+		}
+	} else {
+		// User provided ML config - only fill in missing fields
+		// Note: We don't override user's explicit settings
+
+		// If user hasn't set enabled, use our derived value
+		// Since bool defaults to false, we can't distinguish between
+		// "user explicitly set false" and "user didn't set it"
+		// So we only set the URL if it's empty and we have one
+		if config.MachineLearning.URL == "" && mlURL != "" {
+			config.MachineLearning.URL = mlURL
+		}
+	}
 }
 
 // reconcileLibraryPVC creates the PVC for the photo library if needed

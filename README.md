@@ -270,7 +270,18 @@ The operator deploys Valkey by default. Set `valkey.enabled: false` to use an ex
 
 ### Immich Application Configuration
 
-The `immich.configuration` field accepts Immich's native configuration format. Example:
+The operator automatically generates an Immich configuration file based on CR settings. This base configuration is merged with any user-provided settings in `immich.configuration`.
+
+**Auto-generated settings:**
+
+| Setting | Derived From | Description |
+|---------|--------------|-------------|
+| `machineLearning.enabled` | `spec.machineLearning.enabled` | Automatically set to `false` when ML is disabled |
+| `machineLearning.url` | ML component state | Set to internal service URL or external URL |
+
+**User configuration takes precedence** - any settings you provide in `immich.configuration` will override the auto-generated values.
+
+Example with custom configuration:
 
 ```yaml
 immich:
@@ -286,7 +297,7 @@ immich:
       preset: "medium"
       targetVideoCodec: "h264"
     machineLearning:
-      enabled: true
+      # User settings override auto-generated values
       clip:
         enabled: true
         modelName: "ViT-B-32__openai"
