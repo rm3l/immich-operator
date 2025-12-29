@@ -1,0 +1,301 @@
+/*
+Copyright 2025.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package controller
+
+import (
+	"context"
+	"fmt"
+
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+
+	mediav1alpha1 "github.com/rm3l/immich-operator/api/v1alpha1"
+)
+
+// reconcileMachineLearning creates or updates the Machine Learning deployment and service
+func (r *ImmichReconciler) reconcileMachineLearning(ctx context.Context, immich *mediav1alpha1.Immich) error {
+	log := logf.FromContext(ctx)
+	log.V(1).Info("Reconciling Machine Learning")
+
+	// Create ML PVC first if persistence is enabled (must exist before deployment)
+	persistenceEnabled := immich.Spec.MachineLearning.Persistence.Enabled
+	if persistenceEnabled == nil || *persistenceEnabled {
+		if err := r.reconcileMLPVC(ctx, immich); err != nil {
+			return err
+		}
+	}
+
+	// Create ML Deployment
+	if err := r.reconcileMLDeployment(ctx, immich); err != nil {
+		return err
+	}
+
+	// Create ML Service
+	if err := r.reconcileMLService(ctx, immich); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *ImmichReconciler) reconcileMLDeployment(ctx context.Context, immich *mediav1alpha1.Immich) error {
+	name := fmt.Sprintf("%s-machine-learning", immich.Name)
+	labels := r.getLabels(immich, "machine-learning")
+	selectorLabels := r.getSelectorLabels(immich, "machine-learning")
+
+	replicas := int32(1)
+	if immich.Spec.MachineLearning.Replicas != nil {
+		replicas = *immich.Spec.MachineLearning.Replicas
+	}
+
+	env := []corev1.EnvVar{
+		{Name: "TRANSFORMERS_CACHE", Value: "/cache"},
+		{Name: "HF_XET_CACHE", Value: "/cache/huggingface-xet"},
+		{Name: "MPLCONFIGDIR", Value: "/cache/matplotlib-config"},
+	}
+	env = append(env, immich.Spec.MachineLearning.Env...)
+
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: immich.Namespace,
+			Labels:    labels,
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(immich, deployment, r.Scheme); err != nil {
+		return err
+	}
+
+	return r.createOrUpdate(ctx, deployment, func() error {
+		deployment.Spec = appsv1.DeploymentSpec{
+			Replicas: ptr.To(replicas),
+			Strategy: appsv1.DeploymentStrategy{
+				Type: appsv1.RollingUpdateDeploymentStrategyType,
+			},
+			Selector: &metav1.LabelSelector{
+				MatchLabels: selectorLabels,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:      r.mergeMaps(labels, immich.Spec.MachineLearning.PodLabels),
+					Annotations: immich.Spec.MachineLearning.PodAnnotations,
+				},
+				Spec: corev1.PodSpec{
+					SecurityContext:  immich.Spec.MachineLearning.PodSecurityContext,
+					ImagePullSecrets: immich.Spec.ImagePullSecrets,
+					NodeSelector:     immich.Spec.MachineLearning.NodeSelector,
+					Tolerations:      immich.Spec.MachineLearning.Tolerations,
+					Affinity:         immich.Spec.MachineLearning.Affinity,
+					Containers: []corev1.Container{
+						{
+							Name:            "machine-learning",
+							Image:           immich.GetMachineLearningImage(),
+							ImagePullPolicy: immich.Spec.MachineLearning.ImagePullPolicy,
+							Env:             env,
+							EnvFrom:         immich.Spec.MachineLearning.EnvFrom,
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "http",
+									ContainerPort: 3003,
+									Protocol:      corev1.ProtocolTCP,
+								},
+							},
+							Resources:       immich.Spec.MachineLearning.Resources,
+							SecurityContext: immich.Spec.MachineLearning.SecurityContext,
+							LivenessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									HTTPGet: &corev1.HTTPGetAction{
+										Path: "/ping",
+										Port: intstr.FromString("http"),
+									},
+								},
+								InitialDelaySeconds: 0,
+								PeriodSeconds:       10,
+								TimeoutSeconds:      1,
+								FailureThreshold:    3,
+							},
+							ReadinessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									HTTPGet: &corev1.HTTPGetAction{
+										Path: "/ping",
+										Port: intstr.FromString("http"),
+									},
+								},
+								InitialDelaySeconds: 0,
+								PeriodSeconds:       10,
+								TimeoutSeconds:      1,
+								FailureThreshold:    3,
+							},
+							StartupProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									HTTPGet: &corev1.HTTPGetAction{
+										Path: "/ping",
+										Port: intstr.FromString("http"),
+									},
+								},
+								InitialDelaySeconds: 0,
+								PeriodSeconds:       10,
+								TimeoutSeconds:      1,
+								FailureThreshold:    60,
+							},
+							VolumeMounts: r.getMLVolumeMounts(immich),
+						},
+					},
+					Volumes: r.getMLVolumes(immich),
+				},
+			},
+		}
+		return nil
+	})
+}
+
+func (r *ImmichReconciler) getMLVolumeMounts(_ *mediav1alpha1.Immich) []corev1.VolumeMount {
+	return []corev1.VolumeMount{
+		{
+			Name:      "cache",
+			MountPath: "/cache",
+		},
+	}
+}
+
+func (r *ImmichReconciler) getMLVolumes(immich *mediav1alpha1.Immich) []corev1.Volume {
+	persistenceEnabled := immich.Spec.MachineLearning.Persistence.Enabled
+	if persistenceEnabled != nil && !*persistenceEnabled {
+		return []corev1.Volume{
+			{
+				Name: "cache",
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
+				},
+			},
+		}
+	}
+
+	pvcName := fmt.Sprintf("%s-ml-cache", immich.Name)
+	if immich.Spec.MachineLearning.Persistence.ExistingClaim != "" {
+		pvcName = immich.Spec.MachineLearning.Persistence.ExistingClaim
+	}
+
+	return []corev1.Volume{
+		{
+			Name: "cache",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvcName,
+				},
+			},
+		},
+	}
+}
+
+func (r *ImmichReconciler) reconcileMLService(ctx context.Context, immich *mediav1alpha1.Immich) error {
+	name := fmt.Sprintf("%s-machine-learning", immich.Name)
+	labels := r.getLabels(immich, "machine-learning")
+	selectorLabels := r.getSelectorLabels(immich, "machine-learning")
+
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: immich.Namespace,
+			Labels:    labels,
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(immich, service, r.Scheme); err != nil {
+		return err
+	}
+
+	return r.createOrUpdate(ctx, service, func() error {
+		service.Spec = corev1.ServiceSpec{
+			Type:     corev1.ServiceTypeClusterIP,
+			Selector: selectorLabels,
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "http",
+					Port:       3003,
+					TargetPort: intstr.FromString("http"),
+					Protocol:   corev1.ProtocolTCP,
+				},
+			},
+		}
+		return nil
+	})
+}
+
+func (r *ImmichReconciler) reconcileMLPVC(ctx context.Context, immich *mediav1alpha1.Immich) error {
+	if immich.Spec.MachineLearning.Persistence.ExistingClaim != "" {
+		return nil // Using existing PVC
+	}
+
+	name := fmt.Sprintf("%s-ml-cache", immich.Name)
+	labels := r.getLabels(immich, "machine-learning")
+
+	size := immich.Spec.MachineLearning.Persistence.Size
+	if size.IsZero() {
+		size = resource.MustParse("10Gi")
+	}
+
+	accessModes := immich.Spec.MachineLearning.Persistence.AccessModes
+	if len(accessModes) == 0 {
+		accessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
+	}
+
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: immich.Namespace,
+			Labels:    labels,
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(immich, pvc, r.Scheme); err != nil {
+		return err
+	}
+
+	// Check if PVC already exists - we can't update it
+	existing := &corev1.PersistentVolumeClaim{}
+	err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: immich.Namespace}, existing)
+	if err == nil {
+		// PVC exists, don't update
+		return nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	// Create new PVC
+	pvc.Spec = corev1.PersistentVolumeClaimSpec{
+		AccessModes:      accessModes,
+		StorageClassName: immich.Spec.MachineLearning.Persistence.StorageClass,
+		Resources: corev1.VolumeResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceStorage: size,
+			},
+		},
+	}
+
+	return r.Create(ctx, pvc)
+}

@@ -1,0 +1,363 @@
+/*
+Copyright 2025.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package controller
+
+import (
+	"context"
+	"fmt"
+
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+
+	mediav1alpha1 "github.com/rm3l/immich-operator/api/v1alpha1"
+)
+
+// reconcilePostgres creates or updates the PostgreSQL StatefulSet and service
+func (r *ImmichReconciler) reconcilePostgres(ctx context.Context, immich *mediav1alpha1.Immich) error {
+	log := logf.FromContext(ctx)
+	log.V(1).Info("Reconciling PostgreSQL")
+
+	// Create PostgreSQL credentials secret (if needed)
+	if err := r.reconcilePostgresCredentials(ctx, immich); err != nil {
+		return err
+	}
+
+	// Create PostgreSQL PVC (if not using existing)
+	if err := r.reconcilePostgresPVC(ctx, immich); err != nil {
+		return err
+	}
+
+	// Create PostgreSQL StatefulSet
+	if err := r.reconcilePostgresStatefulSet(ctx, immich); err != nil {
+		return err
+	}
+
+	// Create PostgreSQL Service
+	if err := r.reconcilePostgresService(ctx, immich); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// reconcilePostgresCredentials creates a secret with PostgreSQL credentials if not provided
+func (r *ImmichReconciler) reconcilePostgresCredentials(ctx context.Context, immich *mediav1alpha1.Immich) error {
+	log := logf.FromContext(ctx)
+
+	// Skip if user provided explicit credentials
+	if immich.Spec.Postgres.PasswordSecretRef != nil {
+		log.V(1).Info("Using user-provided PostgreSQL credentials")
+		return nil
+	}
+
+	// Generate credentials secret for built-in PostgreSQL
+	secretName := fmt.Sprintf("%s-postgres-credentials", immich.Name)
+	labels := r.getLabels(immich, "postgres")
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: immich.Namespace,
+			Labels:    labels,
+		},
+	}
+
+	// Check if secret already exists
+	existing := &corev1.Secret{}
+	err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: immich.Namespace}, existing)
+	if err == nil {
+		// Secret exists, don't regenerate
+		log.V(1).Info("PostgreSQL credentials secret already exists", "name", secretName)
+		return nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	// Generate random password
+	password, err := generateRandomPassword(32)
+	if err != nil {
+		return fmt.Errorf("failed to generate PostgreSQL password: %w", err)
+	}
+
+	secret.Data = map[string][]byte{
+		"password": []byte(password),
+		"username": []byte(immich.GetPostgresUsername()),
+		"database": []byte(immich.GetPostgresDatabase()),
+	}
+
+	if err := controllerutil.SetControllerReference(immich, secret, r.Scheme); err != nil {
+		return err
+	}
+
+	log.Info("Creating PostgreSQL credentials secret", "name", secretName)
+	return r.Create(ctx, secret)
+}
+
+// getPostgresPasswordSecretRef returns the secret reference for PostgreSQL password
+// Returns generated secret name if no explicit credentials are provided
+func (r *ImmichReconciler) getPostgresPasswordSecretRef(immich *mediav1alpha1.Immich) *mediav1alpha1.SecretKeySelector {
+	if immich.Spec.Postgres.PasswordSecretRef != nil {
+		return immich.Spec.Postgres.PasswordSecretRef
+	}
+	// Use generated credentials secret
+	return &mediav1alpha1.SecretKeySelector{
+		Name: fmt.Sprintf("%s-postgres-credentials", immich.Name),
+		Key:  "password",
+	}
+}
+
+// reconcilePostgresStatefulSet creates or updates the PostgreSQL StatefulSet
+func (r *ImmichReconciler) reconcilePostgresStatefulSet(ctx context.Context, immich *mediav1alpha1.Immich) error {
+	log := logf.FromContext(ctx)
+	name := fmt.Sprintf("%s-postgres", immich.Name)
+	labels := r.getLabels(immich, "postgres")
+
+	image := immich.GetPostgresImage()
+	if image == "" {
+		return fmt.Errorf("PostgreSQL image not configured: set spec.postgres.image or RELATED_IMAGE_postgres environment variable")
+	}
+
+	// Get password from secret (user-provided or auto-generated)
+	secretRef := r.getPostgresPasswordSecretRef(immich)
+	passwordEnvVar := corev1.EnvVar{
+		Name: "POSTGRES_PASSWORD",
+		ValueFrom: &corev1.EnvVarSource{
+			SecretKeyRef: &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: secretRef.Name,
+				},
+				Key: secretRef.Key,
+			},
+		},
+	}
+
+	env := []corev1.EnvVar{
+		{Name: "POSTGRES_USER", Value: immich.GetPostgresUsername()},
+		{Name: "POSTGRES_DB", Value: immich.GetPostgresDatabase()},
+		{Name: "POSTGRES_INITDB_ARGS", Value: "--data-checksums"},
+		passwordEnvVar,
+	}
+
+	// Build volume mounts
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "data",
+			MountPath: "/var/lib/postgresql/data",
+		},
+	}
+
+	// Build volumes
+	volumes := []corev1.Volume{
+		{
+			Name: "data",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: immich.GetPostgresPVCName(),
+				},
+			},
+		},
+	}
+
+	sts := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: immich.Namespace,
+			Labels:    labels,
+		},
+	}
+
+	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, sts, func() error {
+		if err := controllerutil.SetControllerReference(immich, sts, r.Scheme); err != nil {
+			return err
+		}
+
+		replicas := int32(1)
+		sts.Spec = appsv1.StatefulSetSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+			ServiceName: name,
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:      labels,
+					Annotations: immich.Spec.Postgres.PodAnnotations,
+				},
+				Spec: corev1.PodSpec{
+					ImagePullSecrets: immich.Spec.ImagePullSecrets,
+					SecurityContext:  immich.Spec.Postgres.PodSecurityContext,
+					NodeSelector:     immich.Spec.Postgres.NodeSelector,
+					Tolerations:      immich.Spec.Postgres.Tolerations,
+					Affinity:         immich.Spec.Postgres.Affinity,
+					Volumes:          volumes,
+					Containers: []corev1.Container{
+						{
+							Name:            "postgres",
+							Image:           image,
+							ImagePullPolicy: immich.Spec.Postgres.ImagePullPolicy,
+							Env:             env,
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "postgres",
+									ContainerPort: 5432,
+									Protocol:      corev1.ProtocolTCP,
+								},
+							},
+							VolumeMounts:    volumeMounts,
+							Resources:       immich.Spec.Postgres.Resources,
+							SecurityContext: immich.Spec.Postgres.SecurityContext,
+							ReadinessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									Exec: &corev1.ExecAction{
+										Command: []string{"pg_isready", "-U", immich.GetPostgresUsername(), "-d", immich.GetPostgresDatabase()},
+									},
+								},
+								InitialDelaySeconds: 5,
+								PeriodSeconds:       10,
+							},
+							LivenessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									Exec: &corev1.ExecAction{
+										Command: []string{"pg_isready", "-U", immich.GetPostgresUsername(), "-d", immich.GetPostgresDatabase()},
+									},
+								},
+								InitialDelaySeconds: 30,
+								PeriodSeconds:       10,
+							},
+						},
+					},
+				},
+			},
+		}
+		return nil
+	})
+
+	if err != nil {
+		log.Error(err, "Failed to create/update PostgreSQL StatefulSet")
+		return err
+	}
+
+	return nil
+}
+
+// reconcilePostgresService creates or updates the PostgreSQL Service
+func (r *ImmichReconciler) reconcilePostgresService(ctx context.Context, immich *mediav1alpha1.Immich) error {
+	log := logf.FromContext(ctx)
+	name := fmt.Sprintf("%s-postgres", immich.Name)
+	labels := r.getLabels(immich, "postgres")
+
+	svc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: immich.Namespace,
+			Labels:    labels,
+		},
+	}
+
+	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, svc, func() error {
+		if err := controllerutil.SetControllerReference(immich, svc, r.Scheme); err != nil {
+			return err
+		}
+
+		svc.Spec = corev1.ServiceSpec{
+			Selector: labels,
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "postgres",
+					Port:       5432,
+					TargetPort: intstr.FromString("postgres"),
+					Protocol:   corev1.ProtocolTCP,
+				},
+			},
+		}
+		return nil
+	})
+
+	if err != nil {
+		log.Error(err, "Failed to create/update PostgreSQL Service")
+		return err
+	}
+
+	return nil
+}
+
+// reconcilePostgresPVC creates the PVC for PostgreSQL data if needed
+func (r *ImmichReconciler) reconcilePostgresPVC(ctx context.Context, immich *mediav1alpha1.Immich) error {
+	log := logf.FromContext(ctx)
+
+	if immich.Spec.Postgres.Persistence.ExistingClaim != "" {
+		return nil // Using existing PVC
+	}
+
+	name := immich.GetPostgresPVCName()
+	labels := r.getLabels(immich, "postgres")
+
+	size := immich.Spec.Postgres.Persistence.Size
+	if size.IsZero() {
+		size = resource.MustParse("10Gi")
+	}
+
+	accessModes := immich.Spec.Postgres.Persistence.AccessModes
+	if len(accessModes) == 0 {
+		accessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
+	}
+
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: immich.Namespace,
+			Labels:    labels,
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(immich, pvc, r.Scheme); err != nil {
+		return err
+	}
+
+	// Check if PVC already exists - we can't update it
+	existing := &corev1.PersistentVolumeClaim{}
+	err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: immich.Namespace}, existing)
+	if err == nil {
+		// PVC exists, don't update
+		return nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	// Create new PVC
+	pvc.Spec = corev1.PersistentVolumeClaimSpec{
+		AccessModes:      accessModes,
+		StorageClassName: immich.Spec.Postgres.Persistence.StorageClass,
+		Resources: corev1.VolumeResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceStorage: size,
+			},
+		},
+	}
+
+	log.Info("Creating PostgreSQL PVC", "name", name, "size", size.String())
+	return r.Create(ctx, pvc)
+}
