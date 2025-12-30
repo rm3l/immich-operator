@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -27,6 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -48,7 +51,65 @@ const (
 // ImmichReconciler reconciles a Immich object
 type ImmichReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme          *runtime.Scheme
+	DiscoveryClient discovery.DiscoveryInterface
+
+	// Cache for Route API availability check
+	routeAPIAvailable  bool
+	routeAPIChecked    bool
+	routeAPICheckMutex sync.Mutex
+}
+
+// RouteGVR is the GroupVersionResource for OpenShift Routes
+var RouteGVR = schema.GroupVersionResource{
+	Group:    "route.openshift.io",
+	Version:  "v1",
+	Resource: "routes",
+}
+
+// RouteGVK is the GroupVersionKind for OpenShift Routes
+var RouteGVK = schema.GroupVersionKind{
+	Group:   "route.openshift.io",
+	Version: "v1",
+	Kind:    "Route",
+}
+
+// IsRouteAPIAvailable checks if the OpenShift Route API is available in the cluster
+func (r *ImmichReconciler) IsRouteAPIAvailable() bool {
+	r.routeAPICheckMutex.Lock()
+	defer r.routeAPICheckMutex.Unlock()
+
+	// Return cached result if already checked
+	if r.routeAPIChecked {
+		return r.routeAPIAvailable
+	}
+
+	// Check if Route API is available
+	if r.DiscoveryClient != nil {
+		_, resources, err := r.DiscoveryClient.ServerGroupsAndResources()
+		if err != nil {
+			// If there's an error, assume Route API is not available
+			r.routeAPIChecked = true
+			r.routeAPIAvailable = false
+			return false
+		}
+
+		for _, resourceList := range resources {
+			if resourceList.GroupVersion == "route.openshift.io/v1" {
+				for _, resource := range resourceList.APIResources {
+					if resource.Kind == "Route" {
+						r.routeAPIChecked = true
+						r.routeAPIAvailable = true
+						return true
+					}
+				}
+			}
+		}
+	}
+
+	r.routeAPIChecked = true
+	r.routeAPIAvailable = false
+	return false
 }
 
 // +kubebuilder:rbac:groups=media.rm3l.org,resources=immiches,verbs=get;list;watch;create;update;patch;delete
@@ -61,6 +122,7 @@ type ImmichReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to

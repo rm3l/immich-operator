@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -31,7 +32,7 @@ import (
 	mediav1alpha1 "github.com/rm3l/immich-operator/api/v1alpha1"
 )
 
-// reconcileServer creates or updates the Immich Server deployment, service, and ingress
+// reconcileServer creates or updates the Immich Server deployment, service, and ingress/route
 func (r *ImmichReconciler) reconcileServer(ctx context.Context, immich *mediav1alpha1.Immich) error {
 	log := logf.FromContext(ctx)
 	log.V(1).Info("Reconciling Server")
@@ -46,7 +47,19 @@ func (r *ImmichReconciler) reconcileServer(ctx context.Context, immich *mediav1a
 		return err
 	}
 
-	// Create Server Ingress if enabled
+	// Check if Route API is available (OpenShift)
+	routeAPIAvailable := r.IsRouteAPIAvailable()
+
+	// Create OpenShift Route if should create (auto-detected or explicitly enabled)
+	if immich.ShouldCreateRoute(routeAPIAvailable) {
+		log.V(1).Info("Creating OpenShift Route (Route API available)")
+		if err := r.reconcileServerRoute(ctx, immich); err != nil {
+			return err
+		}
+	}
+
+	// Create Server Ingress if explicitly enabled
+	// Note: Ingress is only created if explicitly enabled, Route takes precedence by default on OpenShift
 	if immich.IsIngressEnabled() {
 		if err := r.reconcileServerIngress(ctx, immich); err != nil {
 			return err
@@ -577,4 +590,91 @@ func (r *ImmichReconciler) reconcileServerIngress(ctx context.Context, immich *m
 	}
 
 	return r.apply(ctx, ingressObj)
+}
+
+// reconcileServerRoute creates or updates the Server OpenShift Route using server-side apply
+func (r *ImmichReconciler) reconcileServerRoute(ctx context.Context, immich *mediav1alpha1.Immich) error {
+	log := logf.FromContext(ctx)
+	log.V(1).Info("Reconciling Server Route")
+
+	name := fmt.Sprintf("%s-server", immich.Name)
+	labels := r.getLabels(immich, "server")
+
+	serverSpec := ptr.Deref(immich.Spec.Server, mediav1alpha1.ServerSpec{})
+	routeSpec := ptr.Deref(serverSpec.Route, mediav1alpha1.RouteSpec{})
+
+	// Merge labels
+	routeLabels := r.mergeMaps(labels, routeSpec.Labels)
+
+	// Build the Route object as unstructured since we don't want to import OpenShift types
+	// This keeps the operator compatible with both vanilla Kubernetes and OpenShift
+	route := map[string]interface{}{
+		"apiVersion": "route.openshift.io/v1",
+		"kind":       "Route",
+		"metadata": map[string]interface{}{
+			"name":        name,
+			"namespace":   immich.Namespace,
+			"labels":      routeLabels,
+			"annotations": routeSpec.Annotations,
+			"ownerReferences": []map[string]interface{}{
+				{
+					"apiVersion":         immich.APIVersion,
+					"kind":               immich.Kind,
+					"name":               immich.Name,
+					"uid":                string(immich.UID),
+					"controller":         true,
+					"blockOwnerDeletion": true,
+				},
+			},
+		},
+		"spec": map[string]interface{}{
+			"to": map[string]interface{}{
+				"kind":   "Service",
+				"name":   name,
+				"weight": int64(100),
+			},
+			"port": map[string]interface{}{
+				"targetPort": "http",
+			},
+			"wildcardPolicy": ptr.Deref(routeSpec.WildcardPolicy, "None"),
+		},
+	}
+
+	// Add host if specified
+	if routeSpec.Host != nil && *routeSpec.Host != "" {
+		route["spec"].(map[string]interface{})["host"] = *routeSpec.Host
+	}
+
+	// Add path if specified
+	if routeSpec.Path != nil && *routeSpec.Path != "" && *routeSpec.Path != "/" {
+		route["spec"].(map[string]interface{})["path"] = *routeSpec.Path
+	}
+
+	// Add TLS configuration if specified
+	if routeSpec.TLS != nil {
+		tlsConfig := map[string]interface{}{
+			"termination":                   ptr.Deref(routeSpec.TLS.Termination, "edge"),
+			"insecureEdgeTerminationPolicy": ptr.Deref(routeSpec.TLS.InsecureEdgeTerminationPolicy, "Redirect"),
+		}
+
+		if routeSpec.TLS.Certificate != nil && *routeSpec.TLS.Certificate != "" {
+			tlsConfig["certificate"] = *routeSpec.TLS.Certificate
+		}
+		if routeSpec.TLS.Key != nil && *routeSpec.TLS.Key != "" {
+			tlsConfig["key"] = *routeSpec.TLS.Key
+		}
+		if routeSpec.TLS.CACertificate != nil && *routeSpec.TLS.CACertificate != "" {
+			tlsConfig["caCertificate"] = *routeSpec.TLS.CACertificate
+		}
+		if routeSpec.TLS.DestinationCACertificate != nil && *routeSpec.TLS.DestinationCACertificate != "" {
+			tlsConfig["destinationCACertificate"] = *routeSpec.TLS.DestinationCACertificate
+		}
+
+		route["spec"].(map[string]interface{})["tls"] = tlsConfig
+	}
+
+	// Convert to unstructured for SSA
+	unstructuredRoute := &unstructured.Unstructured{Object: route}
+
+	return r.apply(ctx, unstructuredRoute)
 }
