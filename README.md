@@ -24,7 +24,7 @@ The operator manages the following Immich components:
 
 ### Prerequisites
 
-- Go version v1.24.0+
+- Go version v1.25.0+
 - Docker version 17.03+
 - kubectl version v1.11.3+
 - Access to a Kubernetes v1.11.3+ cluster
@@ -35,16 +35,10 @@ The operator manages the following Immich components:
 
 ### Installation
 
-**Install the CRDs into the cluster:**
-
-```sh
-make install
-```
-
 **Deploy the operator image to the cluster:**
 
 ```sh
-make deploy IMG=<some-registry>/immich-operator:tag
+make deploy
 ```
 
 ### Quick Start
@@ -519,7 +513,7 @@ make docker-build IMG=myregistry/immich-operator:tag  # Build container
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please feel free to file an issue or submit a pull request.
 
 ## License
 
