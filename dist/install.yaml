@@ -27,6 +27,10 @@ spec:
       jsonPath: .status.ready
       name: Ready
       type: boolean
+    - description: URL to access Immich
+      jsonPath: .status.url
+      name: URL
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
@@ -1050,8 +1054,8 @@ spec:
                               most preferred is the one with the greatest sum of weights, i.e.
                               for each node that meets all of the scheduling requirements (resource
                               request, requiredDuringScheduling anti-affinity expressions, etc.),
-                              compute a sum by iterating through the elements of this field and adding
-                              "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the
+                              compute a sum by iterating through the elements of this field and subtracting
+                              "weight" from the sum if the node has pods which matches the corresponding podAffinityTerm; the
                               node(s) with the highest sum are the most preferred.
                             items:
                               description: The weights of all of the matched WeightedPodAffinityTerm
@@ -1409,8 +1413,9 @@ spec:
                         in a Container.
                       properties:
                         name:
-                          description: Name of the environment variable. Must be a
-                            C_IDENTIFIER.
+                          description: |-
+                            Name of the environment variable.
+                            May consist of any printable ASCII characters except '='.
                           type: string
                         value:
                           description: |-
@@ -1466,6 +1471,43 @@ spec:
                                   type: string
                               required:
                               - fieldPath
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            fileKeyRef:
+                              description: |-
+                                FileKeyRef selects a key of the env file.
+                                Requires the EnvFiles feature gate to be enabled.
+                              properties:
+                                key:
+                                  description: |-
+                                    The key within the env file. An invalid key will prevent the pod from starting.
+                                    The keys defined within a source may consist of any printable ASCII characters except '='.
+                                    During Alpha stage of the EnvFiles feature gate, the key size is limited to 128 characters.
+                                  type: string
+                                optional:
+                                  default: false
+                                  description: |-
+                                    Specify whether the file or its key must be defined. If the file or key
+                                    does not exist, then the env var is not published.
+                                    If optional is set to true and the specified key does not exist,
+                                    the environment variable will not be set in the Pod's containers.
+
+                                    If optional is set to false and the specified key does not exist,
+                                    an error will be returned during Pod creation.
+                                  type: boolean
+                                path:
+                                  description: |-
+                                    The path within the volume from which to select the file.
+                                    Must be relative and may not contain the '..' path or start with '..'.
+                                  type: string
+                                volumeName:
+                                  description: The name of the volume mount containing
+                                    the env file.
+                                  type: string
+                              required:
+                              - key
+                              - path
+                              - volumeName
                               type: object
                               x-kubernetes-map-type: atomic
                             resourceFieldRef:
@@ -1546,8 +1588,9 @@ spec:
                           type: object
                           x-kubernetes-map-type: atomic
                         prefix:
-                          description: Optional text to prepend to the name of each
-                            environment variable. Must be a C_IDENTIFIER.
+                          description: |-
+                            Optional text to prepend to the name of each environment variable.
+                            May consist of any printable ASCII characters except '='.
                           type: string
                         secretRef:
                           description: The Secret to select from
@@ -1864,7 +1907,7 @@ spec:
                           Claims lists the names of resources, defined in spec.resourceClaims,
                           that are used by this container.
 
-                          This is an alpha field and requires enabling the
+                          This field depends on the
                           DynamicResourceAllocation feature gate.
 
                           This field is immutable. It can only be set for containers.
@@ -2127,9 +2170,10 @@ spec:
                         operator:
                           description: |-
                             Operator represents a key's relationship to the value.
-                            Valid operators are Exists and Equal. Defaults to Equal.
+                            Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
                             Exists is equivalent to wildcard for value, so that a pod can
                             tolerate all taints of a particular category.
+                            Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
                           type: string
                         tolerationSeconds:
                           description: |-
@@ -2729,8 +2773,8 @@ spec:
                               most preferred is the one with the greatest sum of weights, i.e.
                               for each node that meets all of the scheduling requirements (resource
                               request, requiredDuringScheduling anti-affinity expressions, etc.),
-                              compute a sum by iterating through the elements of this field and adding
-                              "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the
+                              compute a sum by iterating through the elements of this field and subtracting
+                              "weight" from the sum if the node has pods which matches the corresponding podAffinityTerm; the
                               node(s) with the highest sum are the most preferred.
                             items:
                               description: The weights of all of the matched WeightedPodAffinityTerm
@@ -3397,7 +3441,7 @@ spec:
                           Claims lists the names of resources, defined in spec.resourceClaims,
                           that are used by this container.
 
-                          This is an alpha field and requires enabling the
+                          This field depends on the
                           DynamicResourceAllocation feature gate.
 
                           This field is immutable. It can only be set for containers.
@@ -3660,9 +3704,10 @@ spec:
                         operator:
                           description: |-
                             Operator represents a key's relationship to the value.
-                            Valid operators are Exists and Equal. Defaults to Equal.
+                            Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
                             Exists is equivalent to wildcard for value, so that a pod can
                             tolerate all taints of a particular category.
+                            Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
                           type: string
                         tolerationSeconds:
                           description: |-
@@ -4275,8 +4320,8 @@ spec:
                               most preferred is the one with the greatest sum of weights, i.e.
                               for each node that meets all of the scheduling requirements (resource
                               request, requiredDuringScheduling anti-affinity expressions, etc.),
-                              compute a sum by iterating through the elements of this field and adding
-                              "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the
+                              compute a sum by iterating through the elements of this field and subtracting
+                              "weight" from the sum if the node has pods which matches the corresponding podAffinityTerm; the
                               node(s) with the highest sum are the most preferred.
                             items:
                               description: The weights of all of the matched WeightedPodAffinityTerm
@@ -4632,8 +4677,9 @@ spec:
                         in a Container.
                       properties:
                         name:
-                          description: Name of the environment variable. Must be a
-                            C_IDENTIFIER.
+                          description: |-
+                            Name of the environment variable.
+                            May consist of any printable ASCII characters except '='.
                           type: string
                         value:
                           description: |-
@@ -4689,6 +4735,43 @@ spec:
                                   type: string
                               required:
                               - fieldPath
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            fileKeyRef:
+                              description: |-
+                                FileKeyRef selects a key of the env file.
+                                Requires the EnvFiles feature gate to be enabled.
+                              properties:
+                                key:
+                                  description: |-
+                                    The key within the env file. An invalid key will prevent the pod from starting.
+                                    The keys defined within a source may consist of any printable ASCII characters except '='.
+                                    During Alpha stage of the EnvFiles feature gate, the key size is limited to 128 characters.
+                                  type: string
+                                optional:
+                                  default: false
+                                  description: |-
+                                    Specify whether the file or its key must be defined. If the file or key
+                                    does not exist, then the env var is not published.
+                                    If optional is set to true and the specified key does not exist,
+                                    the environment variable will not be set in the Pod's containers.
+
+                                    If optional is set to false and the specified key does not exist,
+                                    an error will be returned during Pod creation.
+                                  type: boolean
+                                path:
+                                  description: |-
+                                    The path within the volume from which to select the file.
+                                    Must be relative and may not contain the '..' path or start with '..'.
+                                  type: string
+                                volumeName:
+                                  description: The name of the volume mount containing
+                                    the env file.
+                                  type: string
+                              required:
+                              - key
+                              - path
+                              - volumeName
                               type: object
                               x-kubernetes-map-type: atomic
                             resourceFieldRef:
@@ -4769,8 +4852,9 @@ spec:
                           type: object
                           x-kubernetes-map-type: atomic
                         prefix:
-                          description: Optional text to prepend to the name of each
-                            environment variable. Must be a C_IDENTIFIER.
+                          description: |-
+                            Optional text to prepend to the name of each environment variable.
+                            May consist of any printable ASCII characters except '='.
                           type: string
                         secretRef:
                           description: The Secret to select from
@@ -4801,7 +4885,7 @@ spec:
                       for this component
                     type: string
                   ingress:
-                    description: Ingress configuration
+                    description: Ingress configuration (for standard Kubernetes)
                     properties:
                       annotations:
                         additionalProperties:
@@ -5117,7 +5201,7 @@ spec:
                           Claims lists the names of resources, defined in spec.resourceClaims,
                           that are used by this container.
 
-                          This is an alpha field and requires enabling the
+                          This field depends on the
                           DynamicResourceAllocation feature gate.
 
                           This field is immutable. It can only be set for containers.
@@ -5167,6 +5251,81 @@ spec:
                           otherwise to an implementation-defined value. Requests cannot exceed Limits.
                           More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
+                    type: object
+                  route:
+                    description: |-
+                      Route configuration (for OpenShift)
+                      Use this instead of Ingress when running on OpenShift
+                    properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        description: Annotations for the route
+                        type: object
+                      enabled:
+                        description: |-
+                          Enable OpenShift Route. If not set, auto-detects based on cluster capabilities.
+                          Set to false to explicitly disable Route creation on OpenShift.
+                        type: boolean
+                      host:
+                        description: Host is the hostname for the route (optional,
+                          OpenShift will generate one if not set)
+                        type: string
+                      labels:
+                        additionalProperties:
+                          type: string
+                        description: Labels for the route
+                        type: object
+                      path:
+                        default: /
+                        description: Path is the path for the route
+                        type: string
+                      tls:
+                        description: TLS configuration for the route
+                        properties:
+                          caCertificate:
+                            description: CACertificate is the PEM-encoded CA certificate
+                              (optional)
+                            type: string
+                          certificate:
+                            description: Certificate is the PEM-encoded certificate
+                              (optional, uses default certificate if not set)
+                            type: string
+                          destinationCACertificate:
+                            description: DestinationCACertificate is the PEM-encoded
+                              CA certificate for the backend (used with reencrypt)
+                            type: string
+                          insecureEdgeTerminationPolicy:
+                            default: Redirect
+                            description: |-
+                              InsecureEdgeTerminationPolicy indicates the desired behavior for
+                              insecure connections to a route.
+                            enum:
+                            - Allow
+                            - Disable
+                            - Redirect
+                            - None
+                            type: string
+                          key:
+                            description: Key is the PEM-encoded private key (optional)
+                            type: string
+                          termination:
+                            default: edge
+                            description: Termination indicates termination type.
+                            enum:
+                            - edge
+                            - passthrough
+                            - reencrypt
+                            type: string
+                        type: object
+                      wildcardPolicy:
+                        default: None
+                        description: WildcardPolicy defines the wildcard policy for
+                          the route
+                        enum:
+                        - None
+                        - Subdomain
+                        type: string
                     type: object
                   securityContext:
                     description: SecurityContext for the container
@@ -5380,9 +5539,10 @@ spec:
                         operator:
                           description: |-
                             Operator represents a key's relationship to the value.
-                            Valid operators are Exists and Equal. Defaults to Equal.
+                            Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
                             Exists is equivalent to wildcard for value, so that a pod can
                             tolerate all taints of a particular category.
+                            Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
                           type: string
                         tolerationSeconds:
                           description: |-
@@ -5976,8 +6136,8 @@ spec:
                               most preferred is the one with the greatest sum of weights, i.e.
                               for each node that meets all of the scheduling requirements (resource
                               request, requiredDuringScheduling anti-affinity expressions, etc.),
-                              compute a sum by iterating through the elements of this field and adding
-                              "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the
+                              compute a sum by iterating through the elements of this field and subtracting
+                              "weight" from the sum if the node has pods which matches the corresponding podAffinityTerm; the
                               node(s) with the highest sum are the most preferred.
                             items:
                               description: The weights of all of the matched WeightedPodAffinityTerm
@@ -6646,7 +6806,7 @@ spec:
                           Claims lists the names of resources, defined in spec.resourceClaims,
                           that are used by this container.
 
-                          This is an alpha field and requires enabling the
+                          This field depends on the
                           DynamicResourceAllocation feature gate.
 
                           This field is immutable. It can only be set for containers.
@@ -6909,9 +7069,10 @@ spec:
                         operator:
                           description: |-
                             Operator represents a key's relationship to the value.
-                            Valid operators are Exists and Equal. Defaults to Equal.
+                            Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
                             Exists is equivalent to wildcard for value, so that a pod can
                             tolerate all taints of a particular category.
+                            Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
                           type: string
                         tolerationSeconds:
                           description: |-
@@ -7009,6 +7170,9 @@ spec:
               serverReady:
                 description: ServerReady indicates if the server component is ready
                 type: boolean
+              url:
+                description: URL is the URL to access Immich (from Route or Ingress)
+                type: string
               valkeyReady:
                 description: ValkeyReady indicates if the Valkey component is ready
                 type: boolean
@@ -7223,6 +7387,18 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - route.openshift.io
+  resources:
+  - routes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -7358,7 +7534,7 @@ spec:
           value: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
         - name: RELATED_IMAGE_immich_initContainer
           value: docker.io/library/busybox:1.37
-        image: controller:latest
+        image: ghcr.io/rm3l/immich-operator:0.1.0
         livenessProbe:
           httpGet:
             path: /healthz

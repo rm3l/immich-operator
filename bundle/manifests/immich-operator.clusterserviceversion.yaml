@@ -137,10 +137,10 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-12-29T20:22:50Z"
+    createdAt: "2025-12-30T00:50:36Z"
     operators.operatorframework.io/builder: operator-sdk-v1.42.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
-  name: immich-operator.v0.0.1
+  name: immich-operator.v0.1.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -240,6 +240,18 @@ spec:
           - update
           - watch
         - apiGroups:
+          - route.openshift.io
+          resources:
+          - routes
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
           - authentication.k8s.io
           resources:
           - tokenreviews
@@ -291,7 +303,7 @@ spec:
                   value: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
                 - name: RELATED_IMAGE_immich_initContainer
                   value: docker.io/library/busybox:1.37
-                image: controller:latest
+                image: ghcr.io/rm3l/immich-operator:0.1.0
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -395,4 +407,4 @@ spec:
     name: postgres
   - image: docker.io/library/busybox:1.37
     name: immich-initcontainer
-  version: 0.0.1
+  version: 0.1.0
