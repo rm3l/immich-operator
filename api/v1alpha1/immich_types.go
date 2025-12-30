@@ -511,9 +511,14 @@ type ServerSpec struct {
 	// +optional
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 
-	// Ingress configuration
+	// Ingress configuration (for standard Kubernetes)
 	// +optional
 	Ingress *IngressSpec `json:"ingress,omitempty"`
+
+	// Route configuration (for OpenShift)
+	// Use this instead of Ingress when running on OpenShift
+	// +optional
+	Route *RouteSpec `json:"route,omitempty"`
 
 	// Pod annotations
 	// +optional
@@ -911,6 +916,75 @@ type IngressTLS struct {
 	SecretName *string `json:"secretName,omitempty"`
 }
 
+// RouteSpec defines OpenShift Route configuration.
+// On OpenShift clusters, Routes are created by default unless explicitly disabled.
+// On non-OpenShift clusters, Routes are not created unless an Ingress is configured.
+type RouteSpec struct {
+	// Enable OpenShift Route. If not set, auto-detects based on cluster capabilities.
+	// Set to false to explicitly disable Route creation on OpenShift.
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Host is the hostname for the route (optional, OpenShift will generate one if not set)
+	// +optional
+	Host *string `json:"host,omitempty"`
+
+	// Path is the path for the route
+	// +kubebuilder:default="/"
+	// +optional
+	Path *string `json:"path,omitempty"`
+
+	// WildcardPolicy defines the wildcard policy for the route
+	// +kubebuilder:validation:Enum=None;Subdomain
+	// +kubebuilder:default="None"
+	// +optional
+	WildcardPolicy *string `json:"wildcardPolicy,omitempty"`
+
+	// Annotations for the route
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// Labels for the route
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// TLS configuration for the route
+	// +optional
+	TLS *RouteTLSConfig `json:"tls,omitempty"`
+}
+
+// RouteTLSConfig defines TLS configuration for the OpenShift Route.
+type RouteTLSConfig struct {
+	// Termination indicates termination type.
+	// +kubebuilder:validation:Enum=edge;passthrough;reencrypt
+	// +kubebuilder:default="edge"
+	// +optional
+	Termination *string `json:"termination,omitempty"`
+
+	// InsecureEdgeTerminationPolicy indicates the desired behavior for
+	// insecure connections to a route.
+	// +kubebuilder:validation:Enum=Allow;Disable;Redirect;None
+	// +kubebuilder:default="Redirect"
+	// +optional
+	InsecureEdgeTerminationPolicy *string `json:"insecureEdgeTerminationPolicy,omitempty"`
+
+	// Certificate is the PEM-encoded certificate (optional, uses default certificate if not set)
+	// +optional
+	Certificate *string `json:"certificate,omitempty"`
+
+	// Key is the PEM-encoded private key (optional)
+	// +optional
+	Key *string `json:"key,omitempty"`
+
+	// CACertificate is the PEM-encoded CA certificate (optional)
+	// +optional
+	CACertificate *string `json:"caCertificate,omitempty"`
+
+	// DestinationCACertificate is the PEM-encoded CA certificate for the backend (used with reencrypt)
+	// +optional
+	DestinationCACertificate *string `json:"destinationCACertificate,omitempty"`
+}
+
 // ImmichStatus defines the observed state of Immich.
 type ImmichStatus struct {
 	// Conditions represent the latest available observations of the Immich's state
@@ -940,11 +1014,16 @@ type ImmichStatus struct {
 	// ObservedGeneration is the last observed generation
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// URL is the URL to access Immich (from Route or Ingress)
+	// +optional
+	URL string `json:"url,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Ready",type="boolean",JSONPath=".status.ready",description="Whether all components are ready"
+// +kubebuilder:printcolumn:name="URL",type="string",JSONPath=".status.url",description="URL to access Immich"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Immich is the Schema for the immiches API.
@@ -1202,6 +1281,39 @@ func (i *Immich) IsIngressEnabled() bool {
 		return false // default to disabled
 	}
 	return *i.Spec.Server.Ingress.Enabled
+}
+
+// IsRouteEnabled returns true if OpenShift Route is explicitly enabled for the server
+func (i *Immich) IsRouteEnabled() bool {
+	if i.Spec.Server == nil || i.Spec.Server.Route == nil || i.Spec.Server.Route.Enabled == nil {
+		return false
+	}
+	return *i.Spec.Server.Route.Enabled
+}
+
+// IsRouteExplicitlyDisabled returns true if Route is explicitly disabled (set to false)
+func (i *Immich) IsRouteExplicitlyDisabled() bool {
+	if i.Spec.Server == nil || i.Spec.Server.Route == nil || i.Spec.Server.Route.Enabled == nil {
+		return false // not explicitly disabled, just not set
+	}
+	return !*i.Spec.Server.Route.Enabled
+}
+
+// ShouldCreateRoute returns true if a Route should be created
+// It creates a Route if:
+// - Route API is available AND route is not explicitly disabled
+// - OR route is explicitly enabled (even if API check wasn't done)
+func (i *Immich) ShouldCreateRoute(routeAPIAvailable bool) bool {
+	// If explicitly disabled, don't create
+	if i.IsRouteExplicitlyDisabled() {
+		return false
+	}
+	// If explicitly enabled, create
+	if i.IsRouteEnabled() {
+		return true
+	}
+	// Auto-detect: create if Route API is available
+	return routeAPIAvailable
 }
 
 // IsMetricsEnabled returns true if metrics are enabled
