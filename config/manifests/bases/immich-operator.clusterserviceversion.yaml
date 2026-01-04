@@ -4,6 +4,13 @@ metadata:
   annotations:
     alm-examples: '[]'
     capabilities: Basic Install
+    categories: Other
+    containerImage: ghcr.io/rm3l/immich-operator:latest
+    description: |-
+      An Operator for deploying and managing Immich - a high-performance,
+      self-hosted photo and video management solution.
+    repository: https://github.com/rm3l/immich-operator
+    support: rm3l
   name: immich-operator.v0.0.0
   namespace: placeholder
 spec:
@@ -17,7 +24,7 @@ spec:
       version: v1alpha1
   description: A Kubernetes Operator for deploying and managing Immich - a high-performance,
     self-hosted photo and video management solution
-  displayName: Immich Operator
+  displayName: Immich
   icon:
   - base64data: ""
     mediatype: ""
@@ -50,5 +57,5 @@ spec:
   minKubeVersion: 1.26.0
   provider:
     name: Armel Soro
-    url: https://armel.soro.io
-  version: 0.0.0
+    url: https://armel.rm3l.org
+  version: 0.1.0

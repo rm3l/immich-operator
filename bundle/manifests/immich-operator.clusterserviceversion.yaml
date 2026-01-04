@@ -137,9 +137,16 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-12-30T00:50:36Z"
+    categories: Other
+    containerImage: ghcr.io/rm3l/immich-operator:latest
+    createdAt: "2026-01-04T13:05:22Z"
+    description: |-
+      An Operator for deploying and managing Immich - a high-performance,
+      self-hosted photo and video management solution.
     operators.operatorframework.io/builder: operator-sdk-v1.42.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
+    repository: https://github.com/rm3l/immich-operator
+    support: rm3l
   name: immich-operator.v0.1.0
   namespace: placeholder
 spec:
@@ -153,7 +160,7 @@ spec:
       version: v1alpha1
   description: A Kubernetes Operator for deploying and managing Immich - a high-performance,
     self-hosted photo and video management solution
-  displayName: Immich Operator
+  displayName: Immich
   icon:
   - base64data: ""
     mediatype: ""
@@ -395,7 +402,7 @@ spec:
   minKubeVersion: 1.26.0
   provider:
     name: Armel Soro
-    url: https://armel.soro.io
+    url: https://armel.rm3l.org
   relatedImages:
   - image: ghcr.io/immich-app/immich-server:v2.4.1
     name: immich
