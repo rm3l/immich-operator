@@ -4,6 +4,7 @@ metadata:
   annotations:
     alm-examples: '[]'
     capabilities: Basic Install
+    categories: Cloud Provider, AI/Machine Learning
     containerImage: ghcr.io/rm3l/immich-operator:latest
     description: |-
       An Operator for deploying and managing Immich - a high-performance,

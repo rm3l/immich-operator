@@ -137,8 +137,9 @@ metadata:
         }
       ]
     capabilities: Basic Install
+    categories: Cloud Provider, AI/Machine Learning
     containerImage: ghcr.io/rm3l/immich-operator:latest
-    createdAt: "2026-01-04T20:42:27Z"
+    createdAt: "2026-01-05T00:09:34Z"
     description: |-
       An Operator for deploying and managing Immich - a high-performance,
       self-hosted photo and video management solution.
