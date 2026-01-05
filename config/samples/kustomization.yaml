@@ -1,6 +1,8 @@
 ## Append samples of your project ##
 resources:
+# Ensuring OperatorHub displays CRs with most configuration fields by default.
 - media_v1alpha1_immich.yaml
-- media_v1alpha1_immich_minimal.yaml
-- media_v1alpha1_immich_no_ml.yaml
+- media_v1alpha1_immich_existingClaim.yaml
+# - media_v1alpha1_immich_no_ml.yaml
+# - media_v1alpha1_immich_minimal.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples
