@@ -153,6 +153,14 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 lint-config: golangci-lint ## Verify golangci-lint linter configuration
 	$(GOLANGCI_LINT) config verify
 
+.PHONY: lint-operatorhub
+lint-operatorhub: operator-sdk ## Verify bundle manifests meet OperatorHub requirements
+	$(OPERATOR_SDK) bundle validate --select-optional name=operatorhub bundle
+
+.PHONY: validate
+validate: lint-operatorhub lint ## Validate all linting checks
+	@echo "All linting checks passed"
+
 ##@ Build
 
 .PHONY: build
