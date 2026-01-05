@@ -5,7 +5,7 @@ metadata:
     alm-examples: '[]'
     capabilities: Basic Install
     categories: Cloud Provider, AI/Machine Learning
-    containerImage: ghcr.io/rm3l/immich-operator:latest
+    containerImage: ghcr.io/rm3l/immich-operator:0.1.0
     description: |-
       An Operator for deploying and managing Immich - a high-performance,
       self-hosted photo and video management solution.
