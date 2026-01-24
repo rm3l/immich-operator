@@ -100,7 +100,7 @@ func removeNullValues(m map[string]interface{}) {
 func (r *ImmichReconciler) apply(ctx context.Context, obj client.Object) error {
 	log := logf.FromContext(ctx)
 
-	err := r.Patch(ctx, obj, client.Apply, client.FieldOwner(FieldManager), client.ForceOwnership)
+	err := r.Patch(ctx, obj, client.Client.Apply, client.FieldOwner(FieldManager), client.ForceOwnership)
 	if err != nil {
 		return err
 	}
