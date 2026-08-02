@@ -5,7 +5,7 @@ metadata:
     alm-examples: '[]'
     capabilities: Basic Install
     categories: Application Runtime,AI/Machine Learning
-    containerImage: ghcr.io/rm3l/immich-operator:0.1.0
+    containerImage: ghcr.io/rm3l/immich-operator:0.2.0
     description: |-
       An Operator for deploying and managing Immich,
       a self-hosted photo and video management solution.
@@ -59,4 +59,5 @@ spec:
   provider:
     name: Armel Soro
     url: https://armel.rm3l.org
-  version: 0.1.0
+  replaces: immich-operator.v0.1.0
+  version: 0.2.0
