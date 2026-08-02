@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -152,15 +153,19 @@ func (r *ImmichReconciler) applyMLConfigMap(immich *mediav1alpha1.Immich, config
 
 // configSpecToMap converts a ConfigurationSpec to a map, excluding nil fields.
 func (r *ImmichReconciler) configSpecToMap(spec *mediav1alpha1.ConfigurationSpec) map[string]interface{} {
-	// Marshal to YAML then unmarshal to map to get a clean representation
-	// This automatically handles omitempty and excludes nil fields
-	data, err := yaml.Marshal(spec)
+	// Marshal to JSON then unmarshal to map to get a clean representation.
+	// This automatically handles omitempty and excludes nil fields.
+	// JSON (rather than YAML) is used here because the struct fields only
+	// carry `json` tags: yaml.Marshal would fall back to lower-casing the Go
+	// field names (e.g. IssuerURL -> issuerurl), breaking Immich config keys
+	// that are case-sensitive (e.g. oauth.issuerUrl).
+	data, err := json.Marshal(spec)
 	if err != nil {
 		return make(map[string]interface{})
 	}
 
 	var result map[string]interface{}
-	if err := yaml.Unmarshal(data, &result); err != nil {
+	if err := json.Unmarshal(data, &result); err != nil {
 		return make(map[string]interface{})
 	}
 
