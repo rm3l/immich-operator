@@ -46,7 +46,7 @@ Status aggregation (`status.go`) rolls up per-component readiness into `Immich.S
 
 ### Bundle / OLM
 
-`bundle/` and `dist/install.yaml` are generated, checked-in artifacts — never hand-edit them; regenerate via `make bundle build-installer` after changing `config/manifests/bases/immich-operator.clusterserviceversion.yaml`, `config/samples/*` (feeds `alm-examples`), or CRD/RBAC. See `CONTRIBUTING.md` for the full version-bump and OperatorHub submission process, including a known gotcha: the CSV's `containerImage` annotation is not auto-updated by `make bundle` and must be bumped by hand in the base file.
+`bundle/` and `dist/install.yaml` are generated, checked-in artifacts — never hand-edit them; regenerate via `make bundle build-installer` after changing `config/manifests/bases/immich-operator.clusterserviceversion.yaml`, `config/samples/*` (feeds `alm-examples`), or CRD/RBAC. See the [Release Process](CONTRIBUTING.md#release-process) in `CONTRIBUTING.md` for the full version-bump and OperatorHub submission process, including a known gotcha: the CSV's `containerImage` annotation is not auto-updated by `make bundle` and must be bumped by hand in the base file.
 
 ### CI
 
