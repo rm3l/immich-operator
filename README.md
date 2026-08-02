@@ -513,7 +513,7 @@ make docker-build IMG=myregistry/immich-operator:tag  # Build container
 
 ## Contributing
 
-Contributions are welcome! Please feel free to file an issue or submit a pull request.
+Contributions are welcome! Please feel free to file an issue or submit a pull request. See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and the release process.
 
 ## License
 
