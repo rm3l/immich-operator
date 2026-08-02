@@ -22,6 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // Environment variable names for disconnected/air-gapped environments
@@ -1045,7 +1046,11 @@ type ImmichList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&Immich{}, &ImmichList{})
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) error {
+		scheme.AddKnownTypes(GroupVersion, &Immich{}, &ImmichList{})
+		metav1.AddToGroupVersion(scheme, GroupVersion)
+		return nil
+	})
 }
 
 // Helper methods

@@ -100,7 +100,10 @@ func removeNullValues(m map[string]interface{}) {
 func (r *ImmichReconciler) apply(ctx context.Context, obj client.Object) error {
 	log := logf.FromContext(ctx)
 
-	err := r.Patch(ctx, obj, client.Apply, client.FieldOwner(FieldManager), client.ForceOwnership)
+	// client.Client.Apply() requires a typed runtime.ApplyConfiguration (generated
+	// client-gen structs), which doesn't fit this generic client.Object-based helper.
+	// Keep the patch-based server-side apply until that migration is worth doing.
+	err := r.Patch(ctx, obj, client.Apply, client.FieldOwner(FieldManager), client.ForceOwnership) //nolint:staticcheck
 	if err != nil {
 		return err
 	}
